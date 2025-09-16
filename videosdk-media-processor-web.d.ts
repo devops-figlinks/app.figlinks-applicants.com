@@ -1,0 +1,1 @@
+declare module '@videosdk.live/videosdk-media-processor-web';
