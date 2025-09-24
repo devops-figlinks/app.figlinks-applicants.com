@@ -74,7 +74,7 @@ const useQuestionsHook = ({
   const [showNextButtonOrNot, setShowNextButtonOrNot] = useState(false);
   const [submittingInterview, setSubmittingInterview] = useState(false);
   const [isDurationCompleted, setIsDurationCompleted] = useState(false);
-  const { stopRecording } = useMeeting();
+  const { stopRecording, changeMic } = useMeeting();
   const [timer1, setTimer1] = useState(false);
   const [remainingTime, setRemainingTime] = useState(0);
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
@@ -91,6 +91,18 @@ const useQuestionsHook = ({
   const [audioPreloadAttempts, setAudioPreloadAttempts] = useState(0);
   const MAX_AUDIO_PRELOAD_ATTEMPTS = 3;
 
+  const [botMediaRecorder, setBotMediaRecorder] =
+    useState<MediaRecorder | null>(null);
+  const [botAudioChunks, setBotAudioChunks] = useState<Blob[]>([]);
+  const botAudioStreamRef = useRef<MediaStream | null>(null);
+  const recordingStartedRef = useRef(false);
+  const isInitializingRecorderRef = useRef(false);
+  const userMicStreamRef = useRef<MediaStream | null>(null);
+  const micSourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const sharedAudioContextRef = useRef<AudioContext | null>(null);
+  const sharedDestinationNodeRef =
+    useRef<MediaStreamAudioDestinationNode | null>(null);
+
   const isIOS = () => {
     return (
       /iPad|iPhone|iPod/.test(navigator.userAgent) ||
@@ -105,6 +117,150 @@ const useQuestionsHook = ({
       /^((?!chrome|android|crios|fxios).)*safari/i.test(navigator.userAgent) ||
       /iPad|iPhone|iPod/.test(navigator.userAgent)
     );
+  };
+
+  const initializeBotAudioRecording = async () => {
+    try {
+      if (botMediaRecorder) {
+        try {
+          botMediaRecorder.stop();
+        } catch {}
+        setBotMediaRecorder(null);
+      }
+
+      if (sharedAudioContextRef.current) {
+        try {
+          sharedAudioContextRef.current.close();
+        } catch {}
+        sharedAudioContextRef.current = null;
+        sharedDestinationNodeRef.current = null;
+      }
+
+      const audioContext: AudioContext = new ((window as any).AudioContext ||
+        (window as any).webkitAudioContext)();
+      await audioContext.resume();
+
+      const destination = audioContext.createMediaStreamDestination();
+      sharedAudioContextRef.current = audioContext;
+      sharedDestinationNodeRef.current = destination;
+      botAudioStreamRef.current = destination.stream;
+
+      try {
+        const userMic = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          } as any,
+        });
+        userMicStreamRef.current = userMic;
+        const micSource = audioContext.createMediaStreamSource(userMic);
+        micSource.connect(destination);
+        micSourceNodeRef.current = micSource;
+      } catch (micErr) {
+        console.error(
+          "[AudioInit] Failed to capture participant mic for recording:",
+          micErr
+        );
+      }
+
+      setBotAudioChunks([]);
+
+      try {
+        (window as any).__injectedMixedMicActive = true;
+        (window as any).__injectedMixedMicStreamId = (
+          destination.stream as any
+        )?.id;
+        await changeMic(destination.stream as unknown as MediaStream);
+      } catch (e) {
+        console.error("[AudioInit] Failed to inject mixed stream as mic:", e);
+      }
+
+      const recorder = new MediaRecorder(destination.stream, {
+        mimeType: MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+          ? "audio/webm;codecs=opus"
+          : MediaRecorder.isTypeSupported("audio/webm")
+            ? "audio/webm"
+            : "audio/mp4",
+        audioBitsPerSecond: 128000,
+      });
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          setBotAudioChunks((prev) => [...prev, event.data]);
+        }
+      };
+
+      recorder.onerror = (error) => {
+        console.error("[Recorder] Bot audio recording error:", error);
+      };
+
+      recorder.onstop = () => {
+        console.log("[Recorder] Recording stopped");
+      };
+
+      recorder.onstart = () => {
+        console.log("[Recorder] Recording started successfully");
+      };
+
+      setBotMediaRecorder(recorder);
+      recordingStartedRef.current = true;
+
+      try {
+        recorder.start(1000);
+        console.log("[Recorder] SINGLE bot audio recording started");
+      } catch (startError) {
+        console.error("[Recorder] Failed to start recording:", startError);
+        recordingStartedRef.current = false;
+        setBotMediaRecorder(null);
+        throw startError;
+      }
+    } catch (error) {
+      console.error(
+        "[AudioInit] Failed to initialize bot audio recording:",
+        error
+      );
+      recordingStartedRef.current = false;
+    } finally {
+      isInitializingRecorderRef.current = false;
+    }
+  };
+
+  const stopBotAudioRecording = () => {
+    if (botMediaRecorder && botMediaRecorder.state !== "inactive") {
+      botMediaRecorder.stop();
+    }
+    try {
+      changeMic("");
+      (window as any).__injectedMixedMicActive = false;
+      (window as any).__injectedMixedMicStreamId = undefined;
+    } catch (e) {
+      console.error("[AudioStop] Error reverting mic on stop:", e);
+    }
+    if (botAudioStreamRef.current) {
+      botAudioStreamRef.current.getTracks().forEach((track) => track.stop());
+      botAudioStreamRef.current = null;
+    }
+    try {
+      if (micSourceNodeRef.current) {
+        try {
+          micSourceNodeRef.current.disconnect();
+        } catch {}
+        micSourceNodeRef.current = null;
+      }
+      if (userMicStreamRef.current) {
+        userMicStreamRef.current.getTracks().forEach((track) => track.stop());
+        userMicStreamRef.current = null;
+      }
+    } catch (e) {
+      console.error(
+        "[AudioStop] Error cleaning up mic stream after recording stop:",
+        e
+      );
+    }
+    recordingStartedRef.current = false;
+    setBotMediaRecorder(null);
+    setBotAudioChunks([]);
   };
 
   function getMediaDuration(url: string) {
@@ -125,6 +281,7 @@ const useQuestionsHook = ({
       }
     });
   }
+
   const getDurationByQuestionAudio = async () => {
     try {
       const duration = await getMediaDuration(
@@ -144,6 +301,65 @@ const useQuestionsHook = ({
     } catch (error) {
       console.error("Error getting audio duration:", error);
       return 5;
+    }
+  };
+
+  const playWithInjection = async (audio: HTMLAudioElement) => {
+    let cleanedUp = false;
+    let botAudioSource: MediaElementAudioSourceNode | null = null;
+
+    const cleanup = async () => {
+      if (cleanedUp) return;
+      cleanedUp = true;
+      try {
+        if (botAudioSource) {
+          botAudioSource.disconnect();
+          botAudioSource = null;
+        }
+      } catch (e) {
+        console.error("[AudioPlayback] Error cleaning up audio source:", e);
+      }
+    };
+
+    try {
+      if (!isIOS() && "setSinkId" in audio) {
+        try {
+          await (audio as any).setSinkId(selectedSpeakerInMeet);
+        } catch (e) {
+          console.error("[AudioPlayback] setSinkId failed:", e);
+        }
+      }
+
+      const audioContext = sharedAudioContextRef.current;
+      const destination = sharedDestinationNodeRef.current;
+
+      if (!audioContext || !destination) {
+        throw new Error("Shared AudioContext not initialized");
+      }
+
+      if (audioContext.state === "suspended") {
+        await audioContext.resume();
+      }
+
+      botAudioSource = audioContext.createMediaElementSource(audio);
+      botAudioSource.connect(destination);
+      botAudioSource.connect(audioContext.destination);
+
+      const playPromise = audio.play();
+      if (playPromise !== undefined) await playPromise;
+
+      await new Promise<void>((resolve) => {
+        const onEnded = () => {
+          audio.removeEventListener("ended", onEnded);
+          resolve();
+        };
+        audio.addEventListener("ended", onEnded);
+      });
+    } catch (e) {
+      console.error("[AudioPlayback] Injection playback failed:", e);
+      await audio.play();
+    } finally {
+      await cleanup();
     }
   };
 
@@ -170,6 +386,10 @@ const useQuestionsHook = ({
 
   const playIntro = async () => {
     if (introPlayedRef.current) return;
+    introPlayedRef.current = true;
+    if (!recordingStartedRef.current) {
+      await initializeBotAudioRecording();
+    }
 
     if (interviewType === "MCQ") {
       setIsInterviewStarted(true);
@@ -183,7 +403,6 @@ const useQuestionsHook = ({
 
     if (isIOSDevice || isSafariBrowser) {
       try {
-        introPlayedRef.current = true;
         const audio = new Audio();
         const introData = await getItemByIdIntroConclude(1, "intro_conclude");
         if (!introData?.data?.intro_blob) {
@@ -205,17 +424,22 @@ const useQuestionsHook = ({
         }, 1);
 
         if (pathname.includes("/source-device-mobile") || isIOSDevice) {
-          const playPromise = audio.play();
+          const playPromise = (async () => {
+            try {
+              await playWithInjection(audio);
+            } catch (e) {
+              await audio.play();
+            }
+          })();
           if (playPromise !== undefined) {
             playPromise.catch((e) => {
-              console.error("Mobile intro play failed:", e);
               document.addEventListener("click", () => audio.play(), {
                 once: true,
               });
             });
           }
         } else {
-          await getSinkIdAndPlay(audio);
+          await playWithInjection(audio);
         }
 
         setTimeout(
@@ -251,11 +475,7 @@ const useQuestionsHook = ({
 
       audio.src = URL.createObjectURL(introData?.data?.intro_blob as Blob);
 
-      if (pathname.includes("/source-device-mobile")) {
-        audio.play();
-      } else {
-        getSinkIdAndPlay(audio);
-      }
+      await playWithInjection(audio);
 
       let introAudioTime = await getDuration(
         interviewData?.intro_dailog_audio_url
@@ -354,6 +574,8 @@ const useQuestionsHook = ({
   }) => {
     try {
       if (interviewCompleted) return;
+
+      stopBotAudioRecording();
 
       const now = Date.now();
       const updateIntervals = (
@@ -611,14 +833,19 @@ const useQuestionsHook = ({
       }
     }
   };
+
   const onIOSPlayClick: OnIOSPlayClickType = async (audio, event) => {
     try {
       setUserInteractionCaptured(true);
+      if (!recordingStartedRef.current) {
+        await initializeBotAudioRecording();
+      }
       if (audio) {
         try {
-          await audio.play();
+          await playWithInjection(audio);
         } catch (e) {
           console.error("Intro audio play failed:", e);
+          await audio.play();
         }
       }
 
@@ -717,14 +944,7 @@ const useQuestionsHook = ({
         if (isIOSDevice || pathname.includes("/source-device-mobile")) {
           const attemptPlay = async (retryCount = 0) => {
             try {
-              if (questionNo === 0 && userInteractionCaptured) {
-                await audio.play();
-              } else {
-                const playPromise = audio.play();
-                if (playPromise !== undefined) {
-                  await playPromise;
-                }
-              }
+              await playWithInjection(audio);
             } catch (e) {
               console.error(
                 "iOS audio play failed:",
@@ -744,7 +964,7 @@ const useQuestionsHook = ({
 
           await attemptPlay();
         } else {
-          await getSinkIdAndPlay(audio);
+          await playWithInjection(audio);
         }
 
         setRenderTypeWriter(true);
@@ -784,7 +1004,7 @@ const useQuestionsHook = ({
         setShowNextButtonOrNot(true);
       }
     } else {
-      getDurationByQuestionAudio();
+      await getDurationByQuestionAudio();
       let duration: any = await getDuration(
         questions[questionNo]?.qtn_audio_url
       );
@@ -821,17 +1041,16 @@ const useQuestionsHook = ({
           questions[questionNo]?.audio ||
           questions[questionNo]?.qtn_audio_url
         ) {
-          audio.src = URL.createObjectURL(
+          const srcCandidate =
             questions[questionNo]?.audio ||
-              questions[questionNo]?.qtn_audio_url ||
-              ""
-          );
+            questions[questionNo]?.qtn_audio_url ||
+            "";
+          audio.src =
+            typeof srcCandidate === "string"
+              ? (srcCandidate as string)
+              : URL.createObjectURL(srcCandidate as Blob);
         }
-        if (pathname.includes("/source-device-mobile")) {
-          audio.play();
-        } else {
-          getSinkIdAndPlay(audio);
-        }
+        await playWithInjection(audio);
       } else {
         const timeOfQuestion = dayjs().toISOString();
         let tempQuestions = [...questionsWithTimeStamps];
@@ -851,17 +1070,16 @@ const useQuestionsHook = ({
           questions[questionNo]?.qtn_audio_url ||
           questions[questionNo]?.audio
         ) {
-          audio.src = URL.createObjectURL(
+          const srcCandidate =
             questions[questionNo]?.audio ||
-              questions[questionNo]?.qtn_audio_url ||
-              ""
-          );
+            questions[questionNo]?.qtn_audio_url ||
+            "";
+          audio.src =
+            typeof srcCandidate === "string"
+              ? (srcCandidate as string)
+              : URL.createObjectURL(srcCandidate as Blob);
         }
-        if (pathname.includes("/source-device-mobile")) {
-          audio.play();
-        } else {
-          getSinkIdAndPlay(audio);
-        }
+        await playWithInjection(audio);
       }
     }
   };
@@ -881,6 +1099,7 @@ const useQuestionsHook = ({
       if (countdownRef.current) {
         clearInterval(countdownRef.current);
       }
+      stopBotAudioRecording();
     };
   }, []);
 
@@ -1021,11 +1240,7 @@ const useQuestionsHook = ({
     const introData: any = await getItemByIdIntroConclude(1, "intro_conclude");
     audio.src = URL.createObjectURL(introData?.data?.conclude_blob as Blob);
 
-    if (pathname.includes("/source-device-mobile")) {
-      audio.play();
-    } else {
-      getSinkIdAndPlay(audio);
-    }
+    await playWithInjection(audio);
 
     let concludeAudioTime = await getDuration(
       interviewData?.conclude_dailog_audio_url
@@ -1071,6 +1286,18 @@ const useQuestionsHook = ({
   }, [questionNo, isInterviewStarted]);
 
   useEffect(() => {
+    const initRecording = async () => {
+      if (!recordingStartedRef.current) {
+        await initializeBotAudioRecording();
+      }
+    };
+    initRecording();
+    return () => {
+      stopBotAudioRecording();
+    };
+  }, []);
+
+  useEffect(() => {
     if (isSafari() || isIOS()) {
       let cleanupFn: (() => void) | undefined;
       playIntro().then((cleanup) => {
@@ -1094,6 +1321,7 @@ const useQuestionsHook = ({
       if (countdownRef.current) {
         clearInterval(countdownRef.current);
       }
+      stopBotAudioRecording();
     };
   }, []);
 
@@ -1146,6 +1374,7 @@ const useQuestionsHook = ({
       const startSubmittingInterview2 = async () => {
         try {
           if (interviewCompleted) return;
+          stopBotAudioRecording();
           const now = Date.now();
           const updateIntervals = (
             intervals: { awayTime: number; inTime: number | null }[]
@@ -1253,15 +1482,15 @@ const useQuestionsHook = ({
               eye_up_count: detectionCounts.current.eye_up_count,
               eye_down_count: detectionCounts.current.eye_down_count,
               total_eye_right_time: calculateTotalEyeTime(
-                eyeTimeIntervals.right
+              eyeTimeIntervals.right
               ),
               total_eye_left_time: calculateTotalEyeTime(eyeTimeIntervals.left),
               total_eye_up_time: calculateTotalEyeTime(eyeTimeIntervals.up),
               total_eye_down_time: calculateTotalEyeTime(eyeTimeIntervals.down),
               multiple_face_detected:
-                detectionCounts.current.multiple_face_detected_count >= 1,
+              detectionCounts.current.multiple_face_detected_count >= 1,
               multiple_face_detected_count:
-                detectionCounts.current.multiple_face_detected_count,
+              detectionCounts.current.multiple_face_detected_count,
               multiple_face_detected_time: calculateTotalEyeTime(
                 eyeTimeIntervals.multiFaces
               ),
@@ -1340,7 +1569,7 @@ const useQuestionsHook = ({
 
   return {
     renderTypeWriter: renderTypeWriter as boolean,
-    isRedirecting: isRedirecting as boolean,
+    isRedirecting: isRedirecting as boolean,  
     showNextButtonOrNot: showNextButtonOrNot,
     submittingInterview,
     submitInterviewForTesting,
@@ -1357,6 +1586,8 @@ const useQuestionsHook = ({
     audioDataRef,
     isTimerCompleted,
     handleManualNextQuestion,
+    botMediaRecorder,
+    botAudioChunks,
   };
 };
 

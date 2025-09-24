@@ -423,7 +423,7 @@ const MobileMeetingView: FC<IMeetingViewWebAndMobile> = ({
                     selectedDevice={selectedMic}
                     onChangeDevice={handleMicChange}
                     mediaDevicesList={audioDevicesList}
-                    iconSrc="/controls/MicrophoneIcon.svg"
+                    iconSrc="/interviews/MicrophoneIcon.svg"
                   />
                 )}
               </div>
@@ -433,7 +433,7 @@ const MobileMeetingView: FC<IMeetingViewWebAndMobile> = ({
                   selectedDevice={selectedCam}
                   onChangeDevice={handleCamChange}
                   mediaDevicesList={videoDevicesList}
-                  iconSrc="/controls/VideoIcon.svg"
+                  iconSrc="/interviews/VideoIcon.svg"
                 />
               </div>
               <div className="w-full">
@@ -443,7 +443,7 @@ const MobileMeetingView: FC<IMeetingViewWebAndMobile> = ({
                     selectedDevice={selectedPlayback}
                     onChangeDevice={handlePlaybackDeviceChange}
                     mediaDevicesList={playbackDevicesList}
-                    iconSrc="/controls/speakerIcon.svg"
+                    iconSrc="/interviews/speakerIcon.svg"
                     id="test_speaker"
                     isPlaying={isPlaying}
                     audioProgress={audioProgress}

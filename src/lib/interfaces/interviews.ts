@@ -50,6 +50,7 @@ export interface IQuesTime {
   end_time: string;
   id: string;
   difficulty?: string | null | undefined;
+isParticipant?: boolean
 }
 
 export interface IInterviewFilters {

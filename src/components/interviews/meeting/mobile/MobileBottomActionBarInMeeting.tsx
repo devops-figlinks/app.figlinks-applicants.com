@@ -124,12 +124,12 @@ const MobileBottomActionBarInMeeting: FC<IMobileBottomActionBarInMeeting> = ({
               alt="Camera"
               src={
                 joined === "JOINED"
-                  ? "/controls/camera-on.svg"
+                  ? "/interviews/camera-on.svg"
                   : isCameraAllowed
                     ? webcamOn
-                      ? "/controls/camera-on.svg"
-                      : "/controls/camera-off.svg"
-                    : "/controls/camera-off.svg"
+                      ? "/interviews/camera-on.svg"
+                      : "/interviews/camera-off.svg"
+                    : "/interviews/camera-off.svg"
               }
             />
           </div>
