@@ -47,6 +47,7 @@ export interface IPhase1ChatBot {
 export interface IQuesTime {
   qtn: string;
   start_time: string;
+  bot_start_time?: string;
   end_time: string;
   id: string;
   difficulty?: string | null | undefined;
