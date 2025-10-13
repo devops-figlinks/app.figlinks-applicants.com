@@ -229,6 +229,7 @@ export interface IUseMeetingHookReturnType {
   videoStreamOff: boolean;
   setVideoStreamOff: Dispatch<SetStateAction<boolean>>;
   isSafari: boolean;
+  isIOS: () => boolean
 }
 
 export interface IQuesObj {
