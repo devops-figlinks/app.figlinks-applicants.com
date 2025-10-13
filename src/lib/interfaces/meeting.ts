@@ -510,7 +510,7 @@ export interface IUseQuestionHookReturnType {
   handleManualNextQuestion: () => void;
   botMediaRecorder: MediaRecorder | null;
   botAudioChunks: Blob[];
-  
+  isInDelayPeriod:any;
 }
 
 export interface IQuestioningBlock {

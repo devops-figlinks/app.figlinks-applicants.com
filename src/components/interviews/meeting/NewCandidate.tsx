@@ -58,7 +58,7 @@ const NewCandidate = () => {
       if (response?.status == 200 || response?.status == 201) {
         const { data } = response?.data;
         setInterviewData(data);
-      } else if (response.status == 400) {
+      } else if (response.status == 400 || response.status == 404) {
         setCanGetInterviewDetails(false);
         const error = response?.data?.message || "Bad Request";
         setErrorMessage(error);

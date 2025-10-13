@@ -258,7 +258,7 @@ const Meeting = () => {
         }
 
         await getVideoSDKToken(candidateId);
-      } else if (response?.status == 400) {
+      } else if (response?.status == 400 || response?.status == 404) {
         setUserNotFound(true);
         const error = response?.data?.message || "Bad Request";
         setErrorMessage(error);
