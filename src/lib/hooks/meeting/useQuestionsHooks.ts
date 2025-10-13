@@ -414,6 +414,7 @@ const useQuestionsHook = ({
     }
   };
 
+  // ========== INTRO LOGIC - SEPARATE FOR iOS AND NON-iOS ==========
   const playIntro = async () => {
     if (introPlayedRef.current) return;
     introPlayedRef.current = true;
@@ -426,6 +427,7 @@ const useQuestionsHook = ({
       recordingStartedRef.current = false;
     }
 
+    // MCQ MODE HANDLING
     if (interviewType === "MCQ") {
       setIsInterviewStarted(true);
       setTimer(0);
@@ -436,6 +438,7 @@ const useQuestionsHook = ({
       const isIOSDevice = isIOS();
 
       if (isSafariBrowser || isIOSDevice) {
+        // iOS/Safari - MCQ
         setTimeout(async () => {
           const started = await waitUntilRecordingStarted(10000);
           if (started) {
@@ -455,16 +458,27 @@ const useQuestionsHook = ({
           }
         }, 800);
       } else {
+        // NON-iOS - MCQ
         waitUntilRecordingStarted().then((started) => {
           if (started) {
             questionsStarted.current = true;
-            setCountQuestion((prev) => prev + 1);
+            // Set typewriter for first MCQ question
+            setBotSpeechRendered(false);
+            setRenderTypeWriter(false);
+            setTimeout(() => {
+              setRenderTypeWriter(true);
+              setTimeout(() => {
+                setBotSpeechRendered(true);
+                setCountQuestion((prev) => prev + 1);
+              }, 50);
+            }, 50);
           }
         });
       }
       return;
     }
 
+    // NORMAL INTERVIEW MODE
     const isIOSDevice = isIOS();
     const isSafariBrowser = isSafari();
 
@@ -483,19 +497,15 @@ const useQuestionsHook = ({
       let introAudioTime = await getDuration(interviewData?.intro_dailog_audio_url);
       setBotSpeechDuration(introAudioTime as number);
 
-      if (isIOSDevice) {
+      // ===== iOS INTRO TYPEWRITER =====
+      if (isIOSDevice || isSafariBrowser) {
+        console.log('[iOS] Setting intro typewriter');
         setBotSpeechRendered(false);
         setRenderTypeWriter(false);
         await new Promise((resolve) => setTimeout(resolve, 50));
         setRenderTypeWriter(true);
         setBotSpeechRendered(true);
-      } else {
-        setBotSpeechRendered(false);
-        setRenderTypeWriter(true);
-        setBotSpeechRendered(true);
-      }
 
-      if (isIOSDevice || isSafariBrowser) {
         if (pathname.includes("/source-device-mobile") || isIOSDevice) {
           const playPromise = (async () => {
             try {
@@ -527,7 +537,17 @@ const useQuestionsHook = ({
             audio.src = "";
           }
         };
-      } else {
+      } 
+      // ===== NON-iOS INTRO TYPEWRITER =====
+      else {
+        console.log('[Non-iOS] Setting intro typewriter');
+        setBotSpeechRendered(false);
+        setRenderTypeWriter(false);
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        setRenderTypeWriter(true);
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        setBotSpeechRendered(true);
+
         await playWithInjection(audio);
 
         setTimeout(() => {
@@ -555,6 +575,24 @@ const useQuestionsHook = ({
       }
     } catch (err) {
       console.error('Audio playback failed:', err);
+      
+      // Error fallback typewriter
+      const isIOSDevice = isIOS();
+      if (isIOSDevice) {
+        setBotSpeechRendered(false);
+        setRenderTypeWriter(false);
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        setRenderTypeWriter(true);
+        setBotSpeechRendered(true);
+      } else {
+        setBotSpeechRendered(false);
+        setRenderTypeWriter(false);
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        setRenderTypeWriter(true);
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        setBotSpeechRendered(true);
+      }
+      
       setIsInterviewStarted(true);
       setTimer(0);
       startRec();
@@ -702,6 +740,7 @@ const useQuestionsHook = ({
     }
   };
 
+  // ========== QUESTION PLAYBACK - SEPARATE FOR iOS AND NON-iOS ==========
   const playAudioFromQuestions = async () => {
     console.log(`[PlayAudio] Starting playback for question ${questionNo}`);
     await onUserGesture();
@@ -716,6 +755,7 @@ const useQuestionsHook = ({
 
     setIsPlayingQuestion(true);
 
+    // Handle delay for non-first questions (non-MCQ)
     if (questionNo > 0 && interviewType !== "MCQ") {
       console.log(`[PlayAudio] Adding 2s delay before question ${questionNo}`);
       setIsInDelayPeriod(true);
@@ -734,22 +774,28 @@ const useQuestionsHook = ({
       setIsInDelayPeriod(false);
     }
 
+    // MCQ QUESTIONS HANDLING
     if (interviewType === "MCQ" && currentStage === "questions") {
       console.log(`[PlayAudio] MCQ mode - showing question immediately`);
       const isIOSDevice = isIOS();
+      
       if (isIOSDevice) {
+        // iOS MCQ
         setBotSpeechRendered(false);
         setRenderTypeWriter(false);
         await new Promise((resolve) => setTimeout(resolve, 50));
         setRenderTypeWriter(true);
         setBotSpeechRendered(true);
       } else {
+        // NON-iOS MCQ
         setBotSpeechRendered(false);
         setRenderTypeWriter(false);
         await new Promise((resolve) => setTimeout(resolve, 100));
         setRenderTypeWriter(true);
+        await new Promise((resolve) => setTimeout(resolve, 50));
         setBotSpeechRendered(true);
       }
+      
       showNextButton();
       if (hasTimer(questionNo)) {
         setTimer1(true);
@@ -766,6 +812,7 @@ const useQuestionsHook = ({
       const botStartTimeStamp = dayjs().toISOString();
       setBotStartTime(botStartTimeStamp);
 
+      // ===== iOS/SAFARI QUESTION LOGIC =====
       if (isIOSDevice || isSafariBrowser) {
         console.log(`[iOS] Processing question ${questionNo}`);
         let audio: HTMLAudioElement;
@@ -924,6 +971,7 @@ const useQuestionsHook = ({
         await new Promise(resolve => setTimeout(resolve, 200));
         console.log(`[iOS] Audio confirmed playing, now showing typewriter for question ${questionNo}`);
 
+        // iOS TYPEWRITER FOR QUESTIONS
         setBotSpeechRendered(false);
         setRenderTypeWriter(false);
         await new Promise((resolve) => setTimeout(resolve, 50));
@@ -958,42 +1006,54 @@ const useQuestionsHook = ({
           startCountdown();
         }
 
-      } else {
+      } 
+      // ===== NON-iOS QUESTION LOGIC =====
+      else {
         console.log(`[Non-iOS] Processing question ${questionNo}`);
+        
         await getDurationByQuestionAudio();
         let duration: any = await getDuration(questions[questionNo]?.qtn_audio_url);
 
+        console.log(`[Non-iOS] Duration for question ${questionNo}: ${duration}s`);
+
+        // NON-iOS TYPEWRITER FOR QUESTIONS - Show BEFORE audio starts
         setBotSpeechRendered(false);
         setRenderTypeWriter(false);
         await new Promise((resolve) => setTimeout(resolve, 100));
         setRenderTypeWriter(true);
+        await new Promise((resolve) => setTimeout(resolve, 50));
         setBotSpeechRendered(true);
 
+        // Schedule next button
         if (questionNo !== questions.length) {
           setTimeout(() => {
+            console.log(`[Non-iOS] Showing next button for question ${questionNo}`);
             showNextButton();
           }, (duration as number) * 1000);
 
           if (interviewType !== "MCQ" && hasTimer(questionNo)) {
             setTimeout(() => {
+              console.log(`[Non-iOS] Starting timer for question ${questionNo}`);
               setTimer1(true);
               startCountdown();
             }, (duration as number) * 1000);
           }
         }
 
+        // Create and play audio
+        const audio = new Audio();
+        const srcCandidate = questions[questionNo]?.audio || questions[questionNo]?.qtn_audio_url || "";
+        audio.src = typeof srcCandidate === "string" ? srcCandidate : URL.createObjectURL(srcCandidate as Blob);
+
+        // Play audio (non-blocking)
+        playWithInjection(audio).catch(err => {
+          console.error(`[Non-iOS] Audio playback failed for question ${questionNo}:`, err);
+        });
+
+        const questionStartTime = dayjs().toISOString();
+
+        // Update timestamps
         if (questionNo === 0) {
-          const audio = new Audio();
-
-          if (questions[questionNo]?.audio || questions[questionNo]?.qtn_audio_url) {
-            const srcCandidate = questions[questionNo]?.audio || questions[questionNo]?.qtn_audio_url || "";
-            audio.src = typeof srcCandidate === "string" ? (srcCandidate as string) : URL.createObjectURL(srcCandidate as Blob);
-          }
-
-          await playWithInjection(audio);
-
-          const questionStartTime = dayjs().toISOString();
-
           setQuestionsWithTimeStamps([
             {
               qtn: questions[0]?.qtn,
@@ -1001,37 +1061,27 @@ const useQuestionsHook = ({
               bot_start_time: botStartTimeStamp,
               end_time: null,
               id: questions[0]?.id,
-              difficulty: questions[questionNo]?.difficulty,
+              difficulty: questions[0]?.difficulty,
             },
           ]);
         } else {
-          let tempQuestions = [...questionsWithTimeStamps];
-
-          const audio = new Audio();
-
-          if (questions[questionNo]?.qtn_audio_url || questions[questionNo]?.audio) {
-            const srcCandidate = questions[questionNo]?.audio || questions[questionNo]?.qtn_audio_url || "";
-            audio.src = typeof srcCandidate === "string" ? (srcCandidate as string) : URL.createObjectURL(srcCandidate as Blob);
-          }
-
-          await playWithInjection(audio);
-
-          const questionStartTime = dayjs().toISOString();
-
-          const presentQuestion = {
-            qtn: questions[questionNo]?.qtn,
-            start_time: questionStartTime,
-            bot_start_time: botStartTimeStamp,
-            end_time: null,
-            id: questions[questionNo]?.id,
-            difficulty: questions[questionNo]?.difficulty,
-          };
-          tempQuestions = [...tempQuestions, presentQuestion];
-          setQuestionsWithTimeStamps(tempQuestions);
+          setQuestionsWithTimeStamps(prev => [
+            ...prev,
+            {
+              qtn: questions[questionNo]?.qtn,
+              start_time: questionStartTime,
+              bot_start_time: botStartTimeStamp,
+              end_time: null,
+              id: questions[questionNo]?.id,
+              difficulty: questions[questionNo]?.difficulty,
+            }
+          ]);
         }
       }
     } catch (err) {
       console.error(`[PlayAudio] Audio playback failed for question ${questionNo}:`, err);
+      
+      // Error fallback typewriter
       const isIOSDevice = isIOS();
       if (isIOSDevice) {
         setBotSpeechRendered(false);
@@ -1044,6 +1094,7 @@ const useQuestionsHook = ({
         setRenderTypeWriter(false);
         await new Promise(resolve => setTimeout(resolve, 100));
         setRenderTypeWriter(true);
+        await new Promise(resolve => setTimeout(resolve, 50));
         setBotSpeechRendered(true);
       }
       showNextButton();
@@ -1134,7 +1185,7 @@ const useQuestionsHook = ({
   }, [countdownEnded]);
 
   const handleManualNextQuestion = async () => {
-    console.log('[iOS] Manual next button clicked');
+    console.log('[Manual Next] Button clicked');
     await onUserGesture();
     
     if (countdownRef.current) {
@@ -1203,12 +1254,14 @@ const useQuestionsHook = ({
       startTheNextQuestion();
     }
   };
+
+  // ===== TRIGGER LOGIC - SEPARATE FOR iOS AND NON-iOS =====
   useEffect(() => {
     const isIOSDevice = isIOS();
     const isSafariBrowser = isSafari();
 
     if (isIOSDevice || isSafariBrowser) {
-      
+      // iOS/Safari trigger logic
       const timer = setTimeout(() => {
         const shouldPlayQuestion = 
           isInterviewStarted && 
@@ -1228,7 +1281,7 @@ const useQuestionsHook = ({
       
       return () => clearTimeout(timer);
     } else {
-      setRenderTypeWriter(false);
+      // NON-iOS trigger logic
       if (
         countQuestion > 0 &&
         !questionPlayedRef.current.has(questionNo) &&
@@ -1236,8 +1289,16 @@ const useQuestionsHook = ({
         questions.length > 0 &&
         questionNo < questions.length
       ) {
+        console.log(`[Non-iOS Trigger] Playing question ${questionNo}`);
         questionPlayedRef.current.add(questionNo);
-        playAudioFromQuestions();
+        
+        // Reset typewriter before triggering
+        setBotSpeechRendered(false);
+        setRenderTypeWriter(false);
+        
+        setTimeout(() => {
+          playAudioFromQuestions();
+        }, 50);
       }
     }
   }, [countQuestion, questionNo, isInterviewStarted, isPlayingQuestion]);
@@ -1268,11 +1329,13 @@ const useQuestionsHook = ({
       }
     } else if (!questionPlayedRef.current.has(questionNo)) {
       setTimeout(() => {
+        console.log(`[Non-iOS Trigger] Incrementing countQuestion for question ${questionNo}`);
         setCountQuestion((prev) => prev + 1);
       }, 0);
     }
   }, [questionNo, isInterviewStarted, isRecording, questions.length, questionsStarted.current]);
 
+  // ===== CONCLUDE LOGIC - SEPARATE FOR iOS AND NON-iOS =====
   const playConclude = async (): Promise<void> => {
     if (concludeStartedRef.current) {
       return;
@@ -1308,17 +1371,23 @@ const useQuestionsHook = ({
       setBotSpeechDuration(concludeAudioTime as number);
 
       const isIOSDevice = isIOS();
+      
       if (isIOSDevice) {
+        // iOS CONCLUDE TYPEWRITER
+        console.log('[iOS] Setting conclude typewriter');
         setBotSpeechRendered(false);
         setRenderTypeWriter(false);
         await new Promise((resolve) => setTimeout(resolve, 50));
         setRenderTypeWriter(true);
         setBotSpeechRendered(true);
       } else {
+        // NON-iOS CONCLUDE TYPEWRITER
+        console.log('[Non-iOS] Setting conclude typewriter');
         setBotSpeechRendered(false);
         setRenderTypeWriter(false);
         await new Promise((resolve) => setTimeout(resolve, 100));
         setRenderTypeWriter(true);
+        await new Promise((resolve) => setTimeout(resolve, 50));
         setBotSpeechRendered(true);
       }
 

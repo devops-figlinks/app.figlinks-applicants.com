@@ -93,7 +93,7 @@ const QuestioningBlock: FC<IQuestioningBlock> = (props) => {
           </div>
 
           <div className="flex items-center justify-end gap-4">
-            {questions.length ? (
+            {questions.length && !isInterviewComplete ? (
               <Button
                 className={`w-18 h-7 p-1 rounded-sm border-none leading-none capitalize text-sm 3xl:!text-base font-medium md:px-2.5 md:text-[14px] shadow-none ${showNextButtonOrNot
                     ? "active text-[#a533cf] bg-[rgba(165,51,207,.2)] cursor-pointer"

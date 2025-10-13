@@ -166,7 +166,7 @@ const MobileBottomActionBarInMeeting: FC<IMobileBottomActionBarInMeeting> = ({
           >
             Submit
           </Button>
-        ) : (showNextButtonOrNot || (isIOS() && isTimerCompleted)) && (startTheNextQuestion || handleManualNextQuestion) ? (
+       ) : !isInterviewComplete && (showNextButtonOrNot || (isIOS() && isTimerCompleted)) && (startTheNextQuestion || handleManualNextQuestion) ? (
           <motion.div
             className="box"
             initial={{ opacity: 0, scale: 1 }}
