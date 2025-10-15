@@ -149,7 +149,7 @@ const Instructionscomponent = () => {
         if (!data.completed) {
           setLoadingLabel("");
         }
-      } else if (response.status == 404) {
+      } else if (response.status == 404 || response.status == 400) {
         setUserNotFound(true);
         const error = response?.data?.message || "Bad Request";
         setErrorMessage(error);
