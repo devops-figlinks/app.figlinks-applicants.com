@@ -5,7 +5,6 @@ import { Providers } from "@/lib/redux/Provider";
 import { cn } from "@/lib/utils";
 import { Toaster } from "sonner";
 import { Suspense } from "react";
-import dynamic from "next/dynamic";
 import { BaselimeErrorBoundary, BaselimeRum } from "@baselime/react-rum";
 import { PINOLOGGER } from "@/lib/helpers/getBaseURL";
 import { InterviewProvider } from "@/context/InterviewContext";
@@ -14,6 +13,7 @@ import { InterviewProvider } from "@/context/InterviewContext";
 const dmSans = DM_Sans({
   subsets: ["latin"],
   variable: "--font-dm-sans",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -27,8 +27,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-     
+    <html lang="en" className={dmSans.variable}>  
       <body
         className={cn(
           "min-h-screen bg-background antialiased",
