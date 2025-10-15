@@ -11,7 +11,7 @@ import { getVideoSDKTokenAPI } from "@/https/services/videoSDK";
 import { MeetingProvider } from "@videosdk.live/react-sdk";
 import Image from "next/image";
 import { useParams, usePathname } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import Loading from "@/components/core/Loading";
 import MobileMeetingView from "./mobile/MobileMeetinView";
 import { createOrUpdateItemIntroConclude } from "@/helpers/indexedDBIntroConclude";
@@ -122,6 +122,8 @@ const Meeting = () => {
     events: [],
   });
 
+  const hasFetchedData = useRef(false);
+
   const onMeetingLeave = () => {
     setMeetingId(null);
   };
@@ -173,6 +175,12 @@ const Meeting = () => {
   };
 
   const getInterviewByIdAndCandidateCode = async () => {
+    if (hasFetchedData.current) {
+      return;
+    }
+
+    hasFetchedData.current = true;
+
     if (!interview_id || !candidate_code) {
       setUserNotFound(true);
       setLoadingLabel("");
