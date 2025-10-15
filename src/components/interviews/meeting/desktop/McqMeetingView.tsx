@@ -158,34 +158,36 @@ const McqExamScreen = (props: IMcqExamBlock & IQuestioningBlock) => {
               />
             </div>
             <div className="flex items-center justify-end bg-[#ffffff33] border-t border-[#f2f2f2] rounded-b-2xl py-2 px-4 shadow-[0.96px_-0.96px_6.72px_0px_rgba(255,255,255,0.1)_inset,0px_0.853px_20.483px_-0.853px_rgba(0,0,0,0.18)] backdrop-blur-[24.48px]">
-              <Button
-                onClick={
-                  currentStage === "questions" &&
-                  questionNo === questions.length - 1
-                    ? handleSubmit
-                    : currentStage === "intro"
-                      ? handleNext
-                      : handleNext
-                }
-                className="flex items-center cursor-pointer bg-gradient-to-r from-[#430CA6] via-[#A533CF] to-[#EC6D78] text-white font-medium text-sm 3xl:!text-base capitalize px-4 py-2 rounded-md"
-              >
-                <span>
-                  {currentStage === "intro"
-                    ? "Start Questions"
-                    : currentStage === "questions" &&
-                        questionNo === questions.length - 1
-                      ? "Finish & submit"
-                      : currentStage === "questions"
-                        ? "Next"
-                        : "Finish & submit"}
-                </span>
-                <Image
-                  src="/mcq-mobile/arrow-right.svg"
-                  alt=""
-                  width={25}
-                  height={25}
-                />
-              </Button>
+              {currentStage !== "conclusion" && (
+                <Button
+                  onClick={
+                    currentStage === "questions" &&
+                    questionNo === questions.length - 1
+                      ? handleSubmit
+                      : currentStage === "intro"
+                        ? handleNext
+                        : handleNext
+                  }
+                  className="flex items-center cursor-pointer bg-gradient-to-r from-[#430CA6] via-[#A533CF] to-[#EC6D78] text-white font-medium text-sm 3xl:!text-base capitalize px-4 py-2 rounded-md"
+                >
+                  <span>
+                    {currentStage === "intro"
+                      ? "Start Questions"
+                      : currentStage === "questions" &&
+                          questionNo === questions.length - 1
+                        ? "Finish & submit"
+                        : currentStage === "questions"
+                          ? "Next"
+                          : "Finish & submit"}
+                  </span>
+                  <Image
+                    src="/mcq-mobile/arrow-right.svg"
+                    alt=""
+                    width={25}
+                    height={25}
+                  />
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>

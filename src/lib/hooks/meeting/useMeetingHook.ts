@@ -5,7 +5,7 @@ import {
   useParticipant,
 } from "@videosdk.live/react-sdk";
 import { Participant } from "@videosdk.live/react-sdk/dist/types/participant";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useInterviewContext } from "@/context/InterviewContext";
 import { getAllItems } from "@/helpers/indexedDBQuestions";
@@ -19,7 +19,7 @@ import {
   IUseMeeting,
   IUseMeetingHook,
   IUseMeetingHookReturnType,
-  QuestionAnswer,
+  QuestionAnswer
 } from "@/lib/interfaces/meeting";
 import {
   DeviceInfo,
@@ -39,6 +39,12 @@ const useMeetingHook = ({
   webHookObj,
 }: IUseMeetingHook): IUseMeetingHookReturnType => {
   const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+  const isIOS = () => {
+    return (
+      /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
+    );
+  };
   const { interviewType, setInterviewType } = useInterviewContext();
   const [selectedCam, setSelectedCam] = useState<string>("");
   const [selectedMic, setSelectedMic] = useState<string>("");
@@ -64,9 +70,7 @@ const useMeetingHook = ({
   });
   const [endCall, setEndCall] = useState<boolean>(false);
   const [videoStreamOff, setVideoStreamOff] = useState<boolean>(false);
-  const [currentStage, setCurrentStage] = useState<
-    "intro" | "questions" | "conclusion"
-  >("questions");
+  const [currentStage, setCurrentStage] = useState<'intro' | 'questions' | 'conclusion'>('questions');
 
   const detectionCounts = useRef({
     eye_left_count: 0,
@@ -85,6 +89,8 @@ const useMeetingHook = ({
       down: [],
     },
   });
+
+
 
   const [botSpeechDuration, setBotSpeechDuration] = useState(0);
   const [questionDuration, setQuestionDuration] = useState(0);
@@ -108,20 +114,20 @@ const useMeetingHook = ({
     useState<PermissionState>("prompt");
   const [questionAnswers, setQuestionAnswers] = useState<QuestionAnswer[]>([]);
   useEffect(() => {
+
     if (questions && questions.length > 0 && questionAnswers.length === 0) {
-      setQuestionAnswers(
-        questions.map((question) => ({
-          qns: question.qtn,
-          c_answer: question.ans || "",
-          options: question.options || [],
-        }))
-      );
+      setQuestionAnswers(questions.map(question => ({
+        qns: question.qtn,
+        c_answer: question.ans || "",
+        options: question.options || []
+      })));
     }
   }, [questions]);
   const [interviewTimes, setInterviewTimes] = useState<InterviewTimes>({
     firstQuestionTime: null,
-    lastQuestionTime: null,
+    lastQuestionTime: null
   });
+
 
   const [counts, setCounts] = useState<iLogCounts>({
     video: 0,
@@ -130,6 +136,7 @@ const useMeetingHook = ({
     audioTimeIntervals: [],
     leaveCount: 0,
     timeIntervals: [],
+
   });
 
   const [capturedImages, setCapturedImages] = useState<iFaces[]>([]);
@@ -195,6 +202,7 @@ const useMeetingHook = ({
     if (!isRecording) {
       startRecording(webHookObj.endPoint, awsDirPath, config);
     }
+
   };
 
   function onDeviceChanged() {
@@ -236,6 +244,7 @@ const useMeetingHook = ({
     setQuestions(interviewQuestions);
   };
 
+
   const joinMeeting = async () => {
     audioStream &&
       (audioStream as MediaStream)
@@ -258,28 +267,19 @@ const useMeetingHook = ({
     });
   }
 
-  const startTheNextQuestion = useCallback(() => {
+  const startTheNextQuestion = () => {
     if (isInterviewComplete) {
       return;
     }
-    setTimeout(() => {
-      setTimer(0);
-      setQuestionNo(questionNo + 1);
-    }, 0);
-  }, [isInterviewComplete, questionNo]);
-
-  const localParticipantId = useMemo(() => {
-    if (participants.size === 0) return null;
-    for (const [id, participant] of participants) {
-      if (participant.local) {
-        return id;
-      }
-    }
-    return participants.keys().next().value || null;
-  }, [participants]);
-
-  const { webcamStream, webcamOn, captureImage } =
-    useParticipant(localParticipantId);
+    setTimer(0);
+    setQuestionNo(questionNo + 1);
+  };
+  const firstKey = participants.keys().next().value;
+  const {
+    webcamStream,
+    webcamOn,
+    captureImage,
+  } = useParticipant(firstKey);
 
   const imageCountRef = useRef(0);
 
@@ -289,13 +289,15 @@ const useMeetingHook = ({
         const base64 = await captureImage({ height: 1000, width: 1000 });
         imageCountRef.current += 1;
         const imageNumber = imageCountRef.current;
-        setCapturedImages((prev) => [
+        setCapturedImages(prev => [
           ...prev,
           {
             fileName: `image${imageNumber}`,
             base64: base64,
-          },
+          }
         ]);
+
+
       } catch (error) {
         console.error("Error capturing image:", error);
       }
@@ -309,19 +311,12 @@ const useMeetingHook = ({
     const middle = Math.ceil(questions.length / 2) - 1;
     const last = questions.length - 1;
 
-    if (
-      (questionNo === first || questionNo === middle || questionNo === last) &&
-      isInterviewStarted
-    ) {
+    if ((questionNo === first || questionNo === middle || questionNo === last) && isInterviewStarted) {
       imageCapture();
     }
   }, [isRecording, questionNo, isInterviewStarted]);
   const onCamTrigger = async (status?: string) => {
-    if (
-      cameraPermission == "granted" ||
-      cameraPermission == "prompt" ||
-      (status && (status == "granted" || status == "prompt"))
-    ) {
+    if (cameraPermission == "granted" || cameraPermission == "prompt" || (status && (status == "granted" || status == "prompt"))) {
       toggleWebcam();
       videoStream &&
         (videoStream as MediaStream)
@@ -341,11 +336,7 @@ const useMeetingHook = ({
   };
 
   const onMicTrigger = async (status?: string) => {
-    if (
-      microphonePermission == "granted" ||
-      microphonePermission == "prompt" ||
-      (status && (status == "prompt" || status == "granted"))
-    ) {
+    if (microphonePermission == "granted" || microphonePermission == "prompt" || (status && (status == "prompt" || status == "granted"))) {
       toggleMic();
       audioStream &&
         (audioStream as MediaStream)
@@ -368,6 +359,7 @@ const useMeetingHook = ({
     try {
       const requestVideoPermission = await requestPermission("video");
       if (requestVideoPermission?.get("video")) {
+
         let webcams = await getCameras();
         let updatedCams = removeDefaultDevice(webcams);
 
@@ -467,6 +459,7 @@ const useMeetingHook = ({
         audioOutputDevice.set(device.deviceId, device);
     }
   };
+
 
   const handlePlaybackDeviceChange = async (deviceId: string) => {
     setSelectedPlayback(deviceId);
@@ -637,7 +630,9 @@ const useMeetingHook = ({
       questionDurationTimer >= questions[questionNo]?.duration
     ) {
       const intervalId = setInterval(() => {
-        if (timer == 10) {
+        const currentQuestion = questions[questionNo];
+        const hasTimer = currentQuestion && Number(currentQuestion.time_limit) > 0;
+        if (timer == 10 && !hasTimer && !isIOS()) {
           startTheNextQuestion();
         } else {
           let timerValue = timer + 1;
@@ -663,6 +658,7 @@ const useMeetingHook = ({
     checkMediaPermission();
     getNetworkStatistics();
   }, []);
+
 
   useEffect(() => {
     if (botSpeechDuration > 0) {
@@ -761,6 +757,7 @@ const useMeetingHook = ({
     videoStreamOff,
     setVideoStreamOff,
     isSafari,
+    isIOS,
   };
 };
 
