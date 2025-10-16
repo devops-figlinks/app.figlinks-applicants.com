@@ -99,7 +99,7 @@ const QuestioningBlock: FC<IQuestioningBlock> = (props) => {
                     ? "active text-[#a533cf] bg-[rgba(165,51,207,.2)] cursor-pointer"
                     : "inactive bg-gray-300 text-black/60"
                   }`}
-                variant="default"
+                variant="ghost"
                 onClick={startTheNextQuestion}
                 disabled={!showNextButtonOrNot}
               >

@@ -5,20 +5,29 @@ import Image from "next/image";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import Loading from "../core/Loading";
 import { submitReviewAPI } from "@/https/services/interviews";
 
 const RatingAndReview = () => {
   const router = useRouter();
-  const { interview_id, candidate_code } = useParams();
+  const params = useParams();
+  const searchParams = useSearchParams();
+  const interview_id = (params.interview_id as string) || searchParams.get("interview_id") || "";
+  const candidate_code = (params.candidate_code as string) || searchParams.get("candidate_code") || "";
 
   const [review, setReview] = useState("");
   const [rating, setRating] = useState<number | null>(0);
   const [hover, setHover] = useState(-1);
   const [starColor, setStarColor] = useState("#faaf00");
   const [loading, setLoading] = useState(false);
+  const [endCall, setEndCall] = useState<string | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setEndCall(params.get("endCall"));
+  }, []);
 
   const ratingColors: Record<number, string> = {
     1.0: "#FF1A00",
@@ -29,6 +38,10 @@ const RatingAndReview = () => {
   };
 
   const onSubmitReview = async () => {
+    if (!interview_id || !candidate_code) {
+      errPopper("Missing interview details. Please try again.");
+      return;
+    }
     setLoading(true);
     try {
       const body = {
@@ -36,8 +49,8 @@ const RatingAndReview = () => {
         c_rating: rating,
       };
       const response = await submitReviewAPI({
-        interviewId: interview_id as string,
-        candidateCode: candidate_code as string,
+        interviewId: interview_id,
+        candidateCode: candidate_code,
         body,
       });
 
@@ -62,14 +75,6 @@ const RatingAndReview = () => {
       setStarColor(ratingColors[rating]);
     }
   }, [hover, rating]);
-  const [endCall, setEndCall] = useState<string | null>(null);
-
-useEffect(() => {
-  const params = new URLSearchParams(window.location.search);
-  setEndCall(params.get("endCall"));
-}, []);
-
-
 
   return (
     <div className="h-screen bg-[url('/interview@3x.png')] bg-cover bg-no-repeat bg-top pb-2 box-border flex items-start justify-center px-4 sm:p-5">
