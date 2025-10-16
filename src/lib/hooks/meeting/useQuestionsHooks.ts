@@ -735,7 +735,7 @@ const useQuestionsHook = ({
         });
       }
 
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      await new Promise((resolve) => setTimeout(resolve, 500));
       setIsInDelayPeriod(false);
     }
 
@@ -876,7 +876,7 @@ const useQuestionsHook = ({
               audio.removeEventListener('play', onPlay);
               resolve();
             }
-          }, 2000);
+          }, 500);
         });
 
         const audioEnded = new Promise<void>((resolve) => {
@@ -1180,7 +1180,7 @@ const useQuestionsHook = ({
       setTimeout(() => {
         setIsInDelayPeriod(false);
         startTheNextQuestion();
-      }, 2000);
+      }, 500);
     } else {
       startTheNextQuestion();
     }
@@ -1278,7 +1278,7 @@ const useQuestionsHook = ({
 
     setShowNextButtonOrNot(false);
 
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    await new Promise((resolve) => setTimeout(resolve, 500));
 
     try {
       const audio = new Audio();
