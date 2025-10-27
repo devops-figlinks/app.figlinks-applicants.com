@@ -344,9 +344,6 @@ const Meeting = () => {
         <p className="text-lg 3xl:!text-xl font-normal text-black text-center">
           {errorMessage.split(".")} <br />
         </p>
-        <p className="text-lg 3xl:!text-xl font-normal text-black text-center">
-          {errorMessage.split(".") || ""} <br />
-        </p>
         <div className="absolute bottom-0 left-0 max-[767px]:hidden">
           <Image
             src="/interviews/positionImg.svg"

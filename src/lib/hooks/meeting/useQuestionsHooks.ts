@@ -84,7 +84,7 @@ const useQuestionsHook = ({
   const [audioPreloadAttempts, setAudioPreloadAttempts] = useState(0);
   const [isTimerCompleted, setIsTimerCompleted] = useState(false);
   const MAX_AUDIO_PRELOAD_ATTEMPTS = 3;
-
+  const isSubmittingRef = useRef(false);
   const [botMediaRecorder, setBotMediaRecorder] = useState<MediaRecorder | null>(null);
   const [botAudioChunks, setBotAudioChunks] = useState<Blob[]>([]);
   const botAudioStreamRef = useRef<MediaStream | null>(null);
@@ -115,9 +115,32 @@ const useQuestionsHook = ({
 
   const multiFaceCaptureCount = useRef(0);
   const multiFaceDetectionCount = useRef(0);
+  const eyeTransitionCaptureCount = useRef(0);
+  const userAbsenceCaptureCount = useRef(0);
+  const fixedScreenshotFlags = useRef({
+    start: false,
+    mid: false,
+    end: false
+  });
+  
+  const prevMultiFaceCount = useRef(0);
+  const prevEyeLeftCount = useRef(0);
+  const prevEyeRightCount = useRef(0);
+  const prevUserAbsenceCount = useRef(0);
+  
   const lastMultiFaceValue = useRef(0);
+  const noFaceDetectedStartTime = useRef<number | null>(null);
+  const lastFaceDetectionState = useRef(false);
+  const hasPreCaptured = useRef(false);
+  
+  const lastEyeCaptureTime = useRef<number>(0);
+  const lastMultiFaceCaptureTime = useRef<number>(0);
+  const lastAbsenceCaptureTime = useRef<number>(0);
+  const MIN_CAPTURE_INTERVAL = 1000;
+  const COOLDOWN_MS = 1000;
+  const MAX_CAPTURES = 2;
+  
   const fileKeysRef = useRef<string[]>([]);
-  const lastCaptureTime = useRef<number>(0);
   const multiFaceIntervalRef = useRef<{ startTime: number; endTime: number | null }[]>([]);
 
   const questionsStarted = useRef(false);
@@ -528,7 +551,7 @@ const useQuestionsHook = ({
             audio.src = "";
           }
         };
-      }
+      } 
       else {
         setBotSpeechRendered(false);
         setRenderTypeWriter(false);
@@ -564,7 +587,7 @@ const useQuestionsHook = ({
       }
     } catch (err) {
       console.error('Audio playback failed:', err);
-
+      
       const isIOSDevice = isIOS();
       if (isIOSDevice) {
         setBotSpeechRendered(false);
@@ -580,7 +603,7 @@ const useQuestionsHook = ({
         await new Promise((resolve) => setTimeout(resolve, 50));
         setBotSpeechRendered(true);
       }
-
+      
       setIsInterviewStarted(true);
       setTimer(0);
       startRec();
@@ -609,7 +632,7 @@ const useQuestionsHook = ({
           await playWithInjection(audio);
         } catch (e) {
           console.error("[iOS] Intro audio play failed:", e);
-          await audio.play().catch(() => { });
+          await audio.play().catch(() => {});
         }
       }
 
@@ -620,7 +643,7 @@ const useQuestionsHook = ({
       videoSDKRecordingStartedRef.current = true;
 
       const started = await waitUntilRecordingStarted(10000);
-
+      
       if (started) {
         questionsStarted.current = true;
         await new Promise(resolve => setTimeout(resolve, 400));
@@ -655,7 +678,7 @@ const useQuestionsHook = ({
         audio.preload = "auto";
         audio.crossOrigin = "anonymous";
         audio.src = questions[0].qtn_audio_url;
-
+        
         await new Promise((resolve, reject) => {
           const timeout = setTimeout(() => {
             reject(new Error(`Preload timeout on attempt ${attempt}`));
@@ -707,328 +730,328 @@ const useQuestionsHook = ({
     }
   };
 
-  const playAudioFromQuestions = async () => {
-    await onUserGesture();
-    setShowNextButtonOrNot(false);
-    setTimer1(false);
-    setRemainingTime(0);
+ const playAudioFromQuestions = async () => {
+  await onUserGesture();
+  setShowNextButtonOrNot(false);
+  setTimer1(false);
+  setRemainingTime(0);
 
-    if (countdownRef.current) {
-      clearInterval(countdownRef.current);
-      countdownRef.current = null;
+  if (countdownRef.current) {
+    clearInterval(countdownRef.current);
+    countdownRef.current = null;
+  }
+
+  setIsPlayingQuestion(true);
+
+  if (questionNo > 0 && interviewType !== "MCQ") {
+    setIsInDelayPeriod(true);
+
+    if (questionNo - 1 < questionsWithTimeStamps.length) {
+      setQuestionsWithTimeStamps((prev) => {
+        const updated = [...prev];
+        if (updated[questionNo - 1] && !updated[questionNo - 1].end_time) {
+          const endTime = dayjs().toISOString();
+          updated[questionNo - 1].end_time = endTime;
+          const duration = ((new Date(endTime).getTime() - new Date(updated[questionNo - 1].start_time).getTime()) / 1000).toFixed(2);
+        }
+        return updated;
+      });
     }
 
-    setIsPlayingQuestion(true);
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    setIsInDelayPeriod(false);
+  }
 
-    if (questionNo > 0 && interviewType !== "MCQ") {
-      setIsInDelayPeriod(true);
-
-      if (questionNo - 1 < questionsWithTimeStamps.length) {
-        setQuestionsWithTimeStamps((prev) => {
-          const updated = [...prev];
-          if (updated[questionNo - 1] && !updated[questionNo - 1].end_time) {
-            const endTime = dayjs().toISOString();
-            updated[questionNo - 1].end_time = endTime;
-            const duration = ((new Date(endTime).getTime() - new Date(updated[questionNo - 1].start_time).getTime()) / 1000).toFixed(2);
-          }
-          return updated;
-        });
-      }
-
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      setIsInDelayPeriod(false);
+  if (interviewType === "MCQ" && currentStage === "questions") {
+    const isIOSDevice = isIOS();
+    
+    if (isIOSDevice) {
+      setBotSpeechRendered(false);
+      setRenderTypeWriter(false);
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      setRenderTypeWriter(true);
+      setBotSpeechRendered(true);
+    } else {
+      setBotSpeechRendered(false);
+      setRenderTypeWriter(false);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      setRenderTypeWriter(true);
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      setBotSpeechRendered(true);
     }
+    
+    showNextButton();
+    if (hasTimer(questionNo)) {
+      setTimer1(true);
+      startCountdown();
+    }
+    setIsPlayingQuestion(false);
+    return;
+  }
 
-    if (interviewType === "MCQ" && currentStage === "questions") {
-      const isIOSDevice = isIOS();
+  const isIOSDevice = isIOS();
+  const isSafariBrowser = isSafari();
 
-      if (isIOSDevice) {
-        setBotSpeechRendered(false);
-        setRenderTypeWriter(false);
-        await new Promise((resolve) => setTimeout(resolve, 50));
-        setRenderTypeWriter(true);
-        setBotSpeechRendered(true);
+  try {
+    const botStartTimeStamp = dayjs().toISOString();
+    setBotStartTime(botStartTimeStamp);
+
+    if (isIOSDevice || isSafariBrowser) {
+      console.log(`[iOS] Processing question ${questionNo}`);
+      let audio: HTMLAudioElement;
+      let duration: number;
+
+      if (questionNo === 0 && preloadedFirstQuestionAudio) {
+        audio = preloadedFirstQuestionAudio;
+        currentAudioRef.current = audio;
+        audioDataRef.current = audio;
+        audio.currentTime = 0;
+        
+        if (audio.duration && audio.duration > 0) {
+          duration = audio.duration;
+        } else {
+          duration = await getDuration(questions[questionNo]?.qtn_audio_url) as number;
+        }
       } else {
-        setBotSpeechRendered(false);
-        setRenderTypeWriter(false);
-        await new Promise((resolve) => setTimeout(resolve, 100));
-        setRenderTypeWriter(true);
-        await new Promise((resolve) => setTimeout(resolve, 50));
-        setBotSpeechRendered(true);
+        audio = new Audio();
+        audio.preload = "auto";
+        audio.crossOrigin = "anonymous";
+        currentAudioRef.current = audio;
+        audioDataRef.current = audio;
+
+        const audioSrc = questions[questionNo]?.audio || questions[questionNo]?.qtn_audio_url;
+
+        if (audioSrc) {
+          const blobUrl = typeof audioSrc === "string" ? audioSrc : URL.createObjectURL(audioSrc);
+          audio.src = blobUrl;
+
+          await new Promise<void>((resolve, reject) => {
+            const timeout = setTimeout(() => {
+              resolve();
+            }, 4000);
+
+            const onCanPlay = () => {
+              clearTimeout(timeout);
+              audio.removeEventListener("canplaythrough", onCanPlay);
+              audio.removeEventListener("canplay", onCanPlay);
+              audio.removeEventListener("error", onError);
+              resolve();
+            };
+
+            const onError = (e: Event) => {
+              clearTimeout(timeout);
+              audio.removeEventListener("canplaythrough", onCanPlay);
+              audio.removeEventListener("canplay", onCanPlay);
+              audio.removeEventListener("error", onError);
+              resolve();
+            };
+
+            audio.addEventListener("canplaythrough", onCanPlay);
+            audio.addEventListener("canplay", onCanPlay);
+            audio.addEventListener("error", onError);
+
+            if (isIOSDevice) {
+              audio.load();
+            }
+          });
+        }
+        
+        duration = audio.duration || await getDuration(questions[questionNo]?.qtn_audio_url) as number;
       }
+
+      setBotSpeechDuration(duration);
+      
+      audio.onerror = (e) => {
+        setBotSpeechRendered(false);
+        setTimeout(() => {
+          setRenderTypeWriter(true);
+          setBotSpeechRendered(true);
+          showNextButton();
+        }, 100);
+      };
+
+      const audioStartedPlaying = new Promise<void>((resolve) => {
+        let resolved = false;
+        const onPlaying = () => {
+          if (!resolved) {
+            resolved = true;
+            audio.removeEventListener('playing', onPlaying);
+            audio.removeEventListener('play', onPlay);
+            resolve();
+          }
+        };
+        const onPlay = () => {
+          if (!resolved) {
+            resolved = true;
+            audio.removeEventListener('playing', onPlaying);
+            audio.removeEventListener('play', onPlay);
+            resolve();
+          }
+        };
+        
+        audio.addEventListener('playing', onPlaying);
+        audio.addEventListener('play', onPlay);
+        
+        setTimeout(() => {
+          if (!resolved) {
+            resolved = true;
+            audio.removeEventListener('playing', onPlaying);
+            audio.removeEventListener('play', onPlay);
+            resolve();
+          }
+        }, 500);
+      });
+
+      const audioEnded = new Promise<void>((resolve) => {
+        const onEnded = () => {
+          audio.removeEventListener('ended', onEnded);
+          resolve();
+        };
+        audio.addEventListener('ended', onEnded);
+      });
+
+      const playPromise = (async () => {
+        try {
+          if (sharedAudioContextRef.current && sharedAudioContextRef.current.state === 'suspended') {
+            await sharedAudioContextRef.current.resume();
+          }
+          
+          await playWithInjection(audio);
+        } catch (e) {
+          console.error(`[iOS] Play injection failed for question ${questionNo}:`, e);
+          try {
+            await audio.play();
+          } catch (e2) {
+            console.error(`[iOS] Direct play also failed for question ${questionNo}:`, e2);
+            throw e2;
+          }
+        }
+      })();
+
+      await Promise.race([
+        audioStartedPlaying,
+        new Promise(resolve => setTimeout(resolve, 1500))
+      ]);
+
+      await new Promise(resolve => setTimeout(resolve, 200));
+
+      setBotSpeechRendered(false);
+      setRenderTypeWriter(false);
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      setRenderTypeWriter(true);
+      setBotSpeechRendered(true);
+
+      console.log(`[iOS] Waiting for audio to end for question ${questionNo}...`);
+      await audioEnded;
+
+      await new Promise(resolve => setTimeout(resolve, 400));
+
+      const questionStartTime = dayjs().toISOString();
+
+      
+      setQuestionsWithTimeStamps((prev) => {
+        const newQuestion = {
+          qtn: questions[questionNo]?.qtn,
+          start_time: questionStartTime,
+          bot_start_time: botStartTimeStamp,
+          end_time: null,
+          id: questions[questionNo]?.id,
+          difficulty: questions[questionNo]?.difficulty,
+        };
+        return questionNo === 0 ? [newQuestion] : [...prev, newQuestion];
+      });
 
       showNextButton();
-      if (hasTimer(questionNo)) {
+
+      if (interviewType !== "MCQ" && hasTimer(questionNo)) {
+        await new Promise(resolve => setTimeout(resolve, 300));
         setTimer1(true);
         startCountdown();
       }
-      setIsPlayingQuestion(false);
-      return;
-    }
 
-    const isIOSDevice = isIOS();
-    const isSafariBrowser = isSafari();
+    } 
+    else {
+      
+      await getDurationByQuestionAudio();
+      let duration: any = await getDuration(questions[questionNo]?.qtn_audio_url);
 
-    try {
-      const botStartTimeStamp = dayjs().toISOString();
-      setBotStartTime(botStartTimeStamp);
 
-      if (isIOSDevice || isSafariBrowser) {
-        console.log(`[iOS] Processing question ${questionNo}`);
-        let audio: HTMLAudioElement;
-        let duration: number;
+      setBotSpeechRendered(false);
+      setRenderTypeWriter(false);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      setRenderTypeWriter(true);
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      setBotSpeechRendered(true);
 
-        if (questionNo === 0 && preloadedFirstQuestionAudio) {
-          audio = preloadedFirstQuestionAudio;
-          currentAudioRef.current = audio;
-          audioDataRef.current = audio;
-          audio.currentTime = 0;
+      const audio = new Audio();
+      const srcCandidate = questions[questionNo]?.audio || questions[questionNo]?.qtn_audio_url || "";
+      audio.src = typeof srcCandidate === "string" ? srcCandidate : URL.createObjectURL(srcCandidate as Blob);
 
-          if (audio.duration && audio.duration > 0) {
-            duration = audio.duration;
-          } else {
-            duration = await getDuration(questions[questionNo]?.qtn_audio_url) as number;
-          }
-        } else {
-          audio = new Audio();
-          audio.preload = "auto";
-          audio.crossOrigin = "anonymous";
-          currentAudioRef.current = audio;
-          audioDataRef.current = audio;
+      
+      await playWithInjection(audio).catch(err => {
+        console.error(`[Non-iOS] Audio playback failed for question ${questionNo}:`, err);
+      });
 
-          const audioSrc = questions[questionNo]?.audio || questions[questionNo]?.qtn_audio_url;
 
-          if (audioSrc) {
-            const blobUrl = typeof audioSrc === "string" ? audioSrc : URL.createObjectURL(audioSrc);
-            audio.src = blobUrl;
+      const questionStartTime = dayjs().toISOString();
 
-            await new Promise<void>((resolve, reject) => {
-              const timeout = setTimeout(() => {
-                resolve();
-              }, 4000);
+      if (questionNo !== questions.length) {
+        showNextButton();
 
-              const onCanPlay = () => {
-                clearTimeout(timeout);
-                audio.removeEventListener("canplaythrough", onCanPlay);
-                audio.removeEventListener("canplay", onCanPlay);
-                audio.removeEventListener("error", onError);
-                resolve();
-              };
-
-              const onError = (e: Event) => {
-                clearTimeout(timeout);
-                audio.removeEventListener("canplaythrough", onCanPlay);
-                audio.removeEventListener("canplay", onCanPlay);
-                audio.removeEventListener("error", onError);
-                resolve();
-              };
-
-              audio.addEventListener("canplaythrough", onCanPlay);
-              audio.addEventListener("canplay", onCanPlay);
-              audio.addEventListener("error", onError);
-
-              if (isIOSDevice) {
-                audio.load();
-              }
-            });
-          }
-
-          duration = audio.duration || await getDuration(questions[questionNo]?.qtn_audio_url) as number;
+        if (interviewType !== "MCQ" && hasTimer(questionNo)) {
+          setTimer1(true);
+          startCountdown();
         }
+      }
 
-        setBotSpeechDuration(duration);
-
-        audio.onerror = (e) => {
-          setBotSpeechRendered(false);
-          setTimeout(() => {
-            setRenderTypeWriter(true);
-            setBotSpeechRendered(true);
-            showNextButton();
-          }, 100);
-        };
-
-        const audioStartedPlaying = new Promise<void>((resolve) => {
-          let resolved = false;
-          const onPlaying = () => {
-            if (!resolved) {
-              resolved = true;
-              audio.removeEventListener('playing', onPlaying);
-              audio.removeEventListener('play', onPlay);
-              resolve();
-            }
-          };
-          const onPlay = () => {
-            if (!resolved) {
-              resolved = true;
-              audio.removeEventListener('playing', onPlaying);
-              audio.removeEventListener('play', onPlay);
-              resolve();
-            }
-          };
-
-          audio.addEventListener('playing', onPlaying);
-          audio.addEventListener('play', onPlay);
-
-          setTimeout(() => {
-            if (!resolved) {
-              resolved = true;
-              audio.removeEventListener('playing', onPlaying);
-              audio.removeEventListener('play', onPlay);
-              resolve();
-            }
-          }, 500);
-        });
-
-        const audioEnded = new Promise<void>((resolve) => {
-          const onEnded = () => {
-            audio.removeEventListener('ended', onEnded);
-            resolve();
-          };
-          audio.addEventListener('ended', onEnded);
-        });
-
-        const playPromise = (async () => {
-          try {
-            if (sharedAudioContextRef.current && sharedAudioContextRef.current.state === 'suspended') {
-              await sharedAudioContextRef.current.resume();
-            }
-
-            await playWithInjection(audio);
-          } catch (e) {
-            console.error(`[iOS] Play injection failed for question ${questionNo}:`, e);
-            try {
-              await audio.play();
-            } catch (e2) {
-              console.error(`[iOS] Direct play also failed for question ${questionNo}:`, e2);
-              throw e2;
-            }
-          }
-        })();
-
-        await Promise.race([
-          audioStartedPlaying,
-          new Promise(resolve => setTimeout(resolve, 1500))
+      if (questionNo === 0) {
+        setQuestionsWithTimeStamps([
+          {
+            qtn: questions[0]?.qtn,
+            start_time: questionStartTime,
+            bot_start_time: botStartTimeStamp,
+            end_time: null,
+            id: questions[0]?.id,
+            difficulty: questions[0]?.difficulty,
+          },
         ]);
-
-        await new Promise(resolve => setTimeout(resolve, 200));
-
-        setBotSpeechRendered(false);
-        setRenderTypeWriter(false);
-        await new Promise((resolve) => setTimeout(resolve, 50));
-        setRenderTypeWriter(true);
-        setBotSpeechRendered(true);
-
-        console.log(`[iOS] Waiting for audio to end for question ${questionNo}...`);
-        await audioEnded;
-
-        await new Promise(resolve => setTimeout(resolve, 400));
-
-        const questionStartTime = dayjs().toISOString();
-
-
-        setQuestionsWithTimeStamps((prev) => {
-          const newQuestion = {
+      } else {
+        setQuestionsWithTimeStamps(prev => [
+          ...prev,
+          {
             qtn: questions[questionNo]?.qtn,
             start_time: questionStartTime,
             bot_start_time: botStartTimeStamp,
             end_time: null,
             id: questions[questionNo]?.id,
             difficulty: questions[questionNo]?.difficulty,
-          };
-          return questionNo === 0 ? [newQuestion] : [...prev, newQuestion];
-        });
-
-        showNextButton();
-
-        if (interviewType !== "MCQ" && hasTimer(questionNo)) {
-          await new Promise(resolve => setTimeout(resolve, 300));
-          setTimer1(true);
-          startCountdown();
-        }
-
-      }
-      else {
-
-        await getDurationByQuestionAudio();
-        let duration: any = await getDuration(questions[questionNo]?.qtn_audio_url);
-
-
-        setBotSpeechRendered(false);
-        setRenderTypeWriter(false);
-        await new Promise((resolve) => setTimeout(resolve, 100));
-        setRenderTypeWriter(true);
-        await new Promise((resolve) => setTimeout(resolve, 50));
-        setBotSpeechRendered(true);
-
-        const audio = new Audio();
-        const srcCandidate = questions[questionNo]?.audio || questions[questionNo]?.qtn_audio_url || "";
-        audio.src = typeof srcCandidate === "string" ? srcCandidate : URL.createObjectURL(srcCandidate as Blob);
-
-
-        await playWithInjection(audio).catch(err => {
-          console.error(`[Non-iOS] Audio playback failed for question ${questionNo}:`, err);
-        });
-
-
-        const questionStartTime = dayjs().toISOString();
-
-        if (questionNo !== questions.length) {
-          showNextButton();
-
-          if (interviewType !== "MCQ" && hasTimer(questionNo)) {
-            setTimer1(true);
-            startCountdown();
           }
-        }
-
-        if (questionNo === 0) {
-          setQuestionsWithTimeStamps([
-            {
-              qtn: questions[0]?.qtn,
-              start_time: questionStartTime,
-              bot_start_time: botStartTimeStamp,
-              end_time: null,
-              id: questions[0]?.id,
-              difficulty: questions[0]?.difficulty,
-            },
-          ]);
-        } else {
-          setQuestionsWithTimeStamps(prev => [
-            ...prev,
-            {
-              qtn: questions[questionNo]?.qtn,
-              start_time: questionStartTime,
-              bot_start_time: botStartTimeStamp,
-              end_time: null,
-              id: questions[questionNo]?.id,
-              difficulty: questions[questionNo]?.difficulty,
-            }
-          ]);
-        }
+        ]);
       }
-    } catch (err) {
-      console.error(`[PlayAudio] Audio playback failed for question ${questionNo}:`, err);
-
-      const isIOSDevice = isIOS();
-      if (isIOSDevice) {
-        setBotSpeechRendered(false);
-        setRenderTypeWriter(false);
-        await new Promise((resolve) => setTimeout(resolve, 50));
-        setRenderTypeWriter(true);
-        setBotSpeechRendered(true);
-      } else {
-        setBotSpeechRendered(false);
-        setRenderTypeWriter(false);
-        await new Promise(resolve => setTimeout(resolve, 100));
-        setRenderTypeWriter(true);
-        await new Promise(resolve => setTimeout(resolve, 50));
-        setBotSpeechRendered(true);
-      }
-      showNextButton();
-    } finally {
-      setIsPlayingQuestion(false);
     }
-  };
+  } catch (err) {
+    console.error(`[PlayAudio] Audio playback failed for question ${questionNo}:`, err);
+    
+    const isIOSDevice = isIOS();
+    if (isIOSDevice) {
+      setBotSpeechRendered(false);
+      setRenderTypeWriter(false);
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      setRenderTypeWriter(true);
+      setBotSpeechRendered(true);
+    } else {
+      setBotSpeechRendered(false);
+      setRenderTypeWriter(false);
+      await new Promise(resolve => setTimeout(resolve, 100));
+      setRenderTypeWriter(true);
+      await new Promise(resolve => setTimeout(resolve, 50));
+      setBotSpeechRendered(true);
+    }
+    showNextButton();
+  } finally {
+    setIsPlayingQuestion(false);
+  }
+};
 
   const startCountdown = () => {
     if (!hasTimer(questionNo)) {
@@ -1099,7 +1122,9 @@ const useQuestionsHook = ({
     try {
       if (interviewType === "MCQ") {
         if (countdownActionRef.current === "submit") {
-          submitInterviewForTesting();
+          if (!isSubmittingRef.current && !interviewCompleted && !submittingInterview) {
+            submitInterviewForTesting();
+          }
         } else {
           startNextQuestionWithDelay(false);
         }
@@ -1114,7 +1139,7 @@ const useQuestionsHook = ({
 
   const handleManualNextQuestion = async () => {
     await onUserGesture();
-
+    
     if (countdownRef.current) {
       clearInterval(countdownRef.current);
       countdownRef.current = null;
@@ -1128,14 +1153,13 @@ const useQuestionsHook = ({
       if (updated[questionNo] && !updated[questionNo].end_time) {
         const endTime = dayjs().toISOString();
         updated[questionNo].end_time = endTime;
-        const duration = ((new Date(endTime).getTime() - new Date(updated[questionNo].start_time).getTime()) / 1000).toFixed(2);
-      }
+        const duration = ((new Date(endTime).getTime() - new Date(updated[questionNo].start_time).getTime()) / 1000).toFixed(2);      }
       return updated;
     });
 
     setIsTimerCompleted(false);
     countdownActionRef.current = null;
-
+    
     if (interviewType === "MCQ") {
       startNextQuestionWithDelay(false);
     } else {
@@ -1171,7 +1195,7 @@ const useQuestionsHook = ({
         currentAudioRef.current = null;
       }
     } catch { }
-
+    
     setBotSpeechRendered(false);
     setRenderTypeWriter(false);
 
@@ -1192,21 +1216,21 @@ const useQuestionsHook = ({
 
     if (isIOSDevice || isSafariBrowser) {
       const timer = setTimeout(() => {
-        const shouldPlayQuestion =
-          isInterviewStarted &&
-          questionsStarted.current &&
-          questions &&
-          questions.length > 0 &&
+        const shouldPlayQuestion = 
+          isInterviewStarted && 
+          questionsStarted.current && 
+          questions && 
+          questions.length > 0 && 
           questionNo < questions.length &&
           !questionPlayedRef.current.has(questionNo) &&
           !isPlayingQuestion;
-
+        
         if (shouldPlayQuestion) {
           questionPlayedRef.current.add(questionNo);
           playAudioFromQuestions();
         }
       }, questionNo === 0 ? 250 : 150);
-
+      
       return () => clearTimeout(timer);
     } else {
       if (
@@ -1217,10 +1241,10 @@ const useQuestionsHook = ({
         questionNo < questions.length
       ) {
         questionPlayedRef.current.add(questionNo);
-
+        
         setBotSpeechRendered(false);
         setRenderTypeWriter(false);
-
+        
         setTimeout(() => {
           playAudioFromQuestions();
         }, 50);
@@ -1235,7 +1259,7 @@ const useQuestionsHook = ({
 
     const isSafariBrowser = isSafari();
     const isIOSDevice = isIOS();
-
+    
     if ((isSafariBrowser || isIOSDevice) && !questionPlayedRef.current.has(questionNo)) {
       if (questionNo === 0 && questionsStarted.current) {
         setTimeout(() => {
@@ -1256,69 +1280,6 @@ const useQuestionsHook = ({
       }, 0);
     }
   }, [questionNo, isInterviewStarted, isRecording, questions.length, questionsStarted.current]);
-
-  const playConclude = async (): Promise<void> => {
-    if (concludeStartedRef.current) {
-      return;
-    }
-    concludeStartedRef.current = true;
-
-    setIsInterviewCompleted(true);
-
-    if (
-      questionsWithTimeStamps.length > 0 &&
-      !questionsWithTimeStamps[questionsWithTimeStamps.length - 1].end_time
-    ) {
-      const updated = [...questionsWithTimeStamps];
-      const endTime = dayjs().toISOString();
-      updated[updated.length - 1].end_time = endTime;
-      const duration = ((new Date(endTime).getTime() - new Date(updated[updated.length - 1].start_time).getTime()) / 1000).toFixed(2);
-      setQuestionsWithTimeStamps(updated);
-    }
-
-    setShowNextButtonOrNot(false);
-
-    await new Promise((resolve) => setTimeout(resolve, 500));
-
-    try {
-      const audio = new Audio();
-      const introData: any = await getItemByIdIntroConclude(1, "intro_conclude");
-
-      if (!introData?.data?.conclude_blob) {
-        throw new Error("Conclude audio blob not found");
-      }
-
-      audio.src = URL.createObjectURL(introData.data.conclude_blob as Blob);
-
-      let concludeAudioTime = await getDuration(interviewData?.conclude_dailog_audio_url);
-      setBotSpeechDuration(concludeAudioTime as number);
-
-      const isIOSDevice = isIOS();
-
-      if (isIOSDevice) {
-        setBotSpeechRendered(false);
-        setRenderTypeWriter(false);
-        await new Promise((resolve) => setTimeout(resolve, 50));
-        setRenderTypeWriter(true);
-        setBotSpeechRendered(true);
-      } else {
-        setBotSpeechRendered(false);
-        setRenderTypeWriter(false);
-        await new Promise((resolve) => setTimeout(resolve, 100));
-        setRenderTypeWriter(true);
-        await new Promise((resolve) => setTimeout(resolve, 50));
-        setBotSpeechRendered(true);
-      }
-
-      await playWithInjection(audio);
-
-      setTimeout(() => {
-        startSubmittingInterview();
-      }, (concludeAudioTime as number) * 1000);
-    } catch (error) {
-      startSubmittingInterview();
-    }
-  };
 
   const captureImage = (): Promise<{ fileName: string; base64: string } | null> => {
     return new Promise((resolve) => {
@@ -1347,16 +1308,20 @@ const useQuestionsHook = ({
       video.addEventListener("loadedmetadata", () => {
         video.play().catch(() => { });
 
+        let captureAttempts = 0;
+        const maxCaptureAttempts = 5;
+
         const drawFrame = () => {
           if (video.readyState >= 2) {
             const canvas = document.createElement("canvas");
-            canvas.width = video.videoWidth || 640;
-            canvas.height = video.videoHeight || 480;
+            canvas.width = Math.min(video.videoWidth || 640, 1920);
+            canvas.height = Math.min(video.videoHeight || 480, 1080);
             const ctx = canvas.getContext("2d");
             if (ctx && video.videoWidth > 0 && video.videoHeight > 0) {
               ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
               const base64 = canvas.toDataURL("image/jpeg", 0.8);
-              const fileName = `multiface_capture_${Date.now()}_${multiFaceCaptureCount.current}.jpg`;
+              const timestamp = Date.now();
+              const fileName = `screenshot_${timestamp}.jpg`;
               video.pause();
               video.srcObject = null;
               video.removeEventListener("error", onError);
@@ -1364,7 +1329,16 @@ const useQuestionsHook = ({
               return;
             }
           }
-          requestAnimationFrame(drawFrame);
+          
+          captureAttempts++;
+          if (captureAttempts < maxCaptureAttempts) {
+            requestAnimationFrame(drawFrame);
+          } else {
+            video.pause();
+            video.srcObject = null;
+            video.removeEventListener("error", onError);
+            resolve(null);
+          }
         };
 
         drawFrame();
@@ -1378,13 +1352,8 @@ const useQuestionsHook = ({
     });
   };
 
-  const captureAndUpload = async () => {
+  const uploadImageData = async (imageData: { fileName: string; base64: string }, captureType: string) => {
     try {
-      const imageData = await captureImage();
-      if (!imageData) {
-        return;
-      }
-
       const response = await interviewUserImagesAPI({
         payload: {
           file_name: imageData.fileName,
@@ -1396,38 +1365,188 @@ const useQuestionsHook = ({
 
       if (response.status === 200 || response.status === 201) {
         fileKeysRef.current.push(response.data.data.file_key);
+        return response.data.data.file_key;
       } else {
-        console.error("Image upload failed:", response);
+        if (captureType.includes("absence")) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+          const retryResponse = await interviewUserImagesAPI({
+            payload: {
+              file_name: imageData.fileName,
+              base64: imageData.base64,
+            },
+            interviewId: interview_id as string,
+            candidateCode: candidate_code as string,
+          });
+          
+          if (retryResponse.status === 200 || retryResponse.status === 201) {
+            fileKeysRef.current.push(retryResponse.data.data.file_key);
+            return retryResponse.data.data.file_key;
+          }
+        }
+        return null;
       }
     } catch (error) {
+      if (captureType.includes("absence")) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        try {
+          const retryResponse = await interviewUserImagesAPI({
+            payload: {
+              file_name: imageData.fileName,
+              base64: imageData.base64,
+            },
+            interviewId: interview_id as string,
+            candidateCode: candidate_code as string,
+          });
+          
+          if (retryResponse.status === 200 || retryResponse.status === 201) {
+            fileKeysRef.current.push(retryResponse.data.data.file_key);
+            return retryResponse.data.data.file_key;
+          }
+        } catch (retryError) {
+        }
+      }
+      return null;
+    }
+  };
+
+  const captureAndUpload = async (captureType: string) => {
+    try {
+      const isAbsenceCapture = captureType.includes("absence");
+      
+      const imageData = await captureImage();
+      if (!imageData) {
+        if (isAbsenceCapture) {
+          for (let i = 0; i < 3; i++) {
+            await new Promise(resolve => setTimeout(resolve, 250));
+            const retryImageData = await captureImage();
+            if (retryImageData) {
+              const result = await uploadImageData(retryImageData, captureType);
+              if (result) return result;
+            }
+          }
+        }
+        return;
+      }
+      
+      const result = await uploadImageData(imageData, captureType);
+      if (!result && isAbsenceCapture) {
+        for (let i = 0; i < 3; i++) {
+          await new Promise(resolve => setTimeout(resolve, 250));
+          const retryImageData = await captureImage();
+          if (retryImageData) {
+            const retryResult = await uploadImageData(retryImageData, captureType);
+            if (retryResult) return retryResult;
+          }
+        }
+      }
+      return result;
+    } catch (error) {
       console.error("Error in captureAndUpload:", error);
+      const isAbsenceCapture = captureType.includes("absence");
+      if (isAbsenceCapture) {
+        try {
+          for (let i = 0; i < 3; i++) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+            const imageData = await captureImage();
+            if (imageData) {
+              const result = await uploadImageData(imageData, captureType);
+              if (result) return result;
+            }
+          }
+        } catch (retryError) {
+          console.error("Retry failed for captureAndUpload:", retryError);
+        }
+      }
     }
   };
 
   useEffect(() => {
-    const COOLDOWN_MS = 2000;
-    const MAX_CAPTURES = 3;
+    if (!isInterviewStarted || !isRecording || interviewCompleted) return;
 
-    const interval = setInterval(() => {
-      if (!questionsStarted.current || !isInterviewStarted || interviewCompleted) {
-        return;
+    const totalQuestions = questions.length;
+    const midPoint = Math.floor(totalQuestions / 2);
+
+    if (questionNo === 0 && !fixedScreenshotFlags.current.start) {
+      fixedScreenshotFlags.current.start = true;
+      captureAndUpload("fixedstart");
+      
+      eyeTransitionCaptureCount.current = 0;
+      multiFaceCaptureCount.current = 0;
+      userAbsenceCaptureCount.current = 0;
+      prevEyeLeftCount.current = 0;
+      prevEyeRightCount.current = 0;
+      prevMultiFaceCount.current = 0;
+      prevUserAbsenceCount.current = 0;
+      noFaceDetectedStartTime.current = null;
+      lastFaceDetectionState.current = false;
+      hasPreCaptured.current = false;
+      lastEyeCaptureTime.current = 0;
+      lastMultiFaceCaptureTime.current = 0;
+      lastAbsenceCaptureTime.current = 0;
+      fileKeysRef.current = [];
+    }
+
+    if (questionNo === midPoint && !fixedScreenshotFlags.current.mid && totalQuestions > 1) {
+      fixedScreenshotFlags.current.mid = true;
+      captureAndUpload("fixedmid");
+    }
+
+    if (questionNo === totalQuestions - 1 && !fixedScreenshotFlags.current.end) {
+      fixedScreenshotFlags.current.end = true;
+      captureAndUpload("fixedend");
+    }
+  }, [questionNo, isInterviewStarted, isRecording, interviewCompleted, questions.length]);
+
+  useEffect(() => {
+    if (!isInterviewStarted || !isRecording || interviewCompleted) return;
+
+    const checkInterval = setInterval(() => {
+      const currentLeftCount = detectionCounts.current.eyeleftcount || detectionCounts.current.eye_left_count || 0;
+      const currentRightCount = detectionCounts.current.eyerightcount || detectionCounts.current.eye_right_count || 0;
+
+      const leftIncreased = currentLeftCount > prevEyeLeftCount.current;
+      const rightIncreased = currentRightCount > prevEyeRightCount.current;
+
+      if ((leftIncreased || rightIncreased) && eyeTransitionCaptureCount.current < MAX_CAPTURES) {
+        const now = Date.now();
+        const timeSinceLastCapture = now - lastEyeCaptureTime.current;
+
+        if (timeSinceLastCapture >= MIN_CAPTURE_INTERVAL || lastEyeCaptureTime.current === 0) {
+          const direction = leftIncreased ? "left" : "right";
+          captureAndUpload(`eyetransition_${direction}`);
+          eyeTransitionCaptureCount.current++;
+          lastEyeCaptureTime.current = now;
+        }
       }
 
-      const currentCount = detectionCounts.current.multiple_face_detected_count;
+      prevEyeLeftCount.current = currentLeftCount;
+      prevEyeRightCount.current = currentRightCount;
+    }, 500);
+
+    return () => clearInterval(checkInterval);
+  }, [isInterviewStarted, isRecording, interviewCompleted]);
+
+  useEffect(() => {
+    if (!questionsStarted.current || !isInterviewStarted || interviewCompleted) {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      const currentCount = detectionCounts.current.multiplefacedetectedcount || detectionCounts.current.multiple_face_detected_count || 0;
       if (currentCount > lastMultiFaceValue.current) {
         const delta = currentCount - lastMultiFaceValue.current;
         multiFaceDetectionCount.current += delta;
         lastMultiFaceValue.current = currentCount;
         const now = Date.now();
-        const canCapture = (now - lastCaptureTime.current) >= COOLDOWN_MS && multiFaceCaptureCount.current < MAX_CAPTURES;
+        const canCapture = (now - lastMultiFaceCaptureTime.current) >= COOLDOWN_MS && multiFaceCaptureCount.current < MAX_CAPTURES;
 
         if (canCapture) {
           multiFaceCaptureCount.current++;
-          lastCaptureTime.current = now;
-          captureAndUpload();
+          lastMultiFaceCaptureTime.current = now;
+          captureAndUpload('multifacedetection');
         }
       }
-    }, 1000);
+    }, 500);
 
     return () => clearInterval(interval);
   }, [isInterviewStarted, interviewCompleted]);
@@ -1440,7 +1559,7 @@ const useQuestionsHook = ({
         return;
       }
 
-      const currentCount = detectionCounts.current.multiple_face_detected_count;
+      const currentCount = detectionCounts.current.multiplefacedetectedcount || detectionCounts.current.multiple_face_detected_count || 0;
       const intervals = multiFaceIntervalRef.current;
 
       if (currentCount > 0) {
@@ -1475,7 +1594,6 @@ const useQuestionsHook = ({
   const calculateMultiFaceTime = (): number => {
     const intervals = multiFaceIntervalRef.current;
     const now = Date.now();
-
     const totalTimeMs = intervals.reduce((total, interval) => {
       const endTime = interval.endTime !== null ? interval.endTime : now;
       const duration = endTime - interval.startTime;
@@ -1484,6 +1602,113 @@ const useQuestionsHook = ({
 
     return Math.round((totalTimeMs / 1000) * 100) / 100;
   };
+
+  useEffect(() => {
+    if (!isInterviewStarted || !isRecording || interviewCompleted) return;
+
+    const handleUserAbsence = (event: CustomEvent) => {
+      const now = Date.now();
+      const timeSinceLastCapture = now - lastAbsenceCaptureTime.current;
+
+      if (userAbsenceCaptureCount.current < MAX_CAPTURES && (timeSinceLastCapture >= MIN_CAPTURE_INTERVAL || lastAbsenceCaptureTime.current === 0)) {
+        captureAndUpload(`userabsenceFromCamera`);
+        userAbsenceCaptureCount.current++;
+        prevUserAbsenceCount.current++;
+        lastAbsenceCaptureTime.current = now;
+      }
+    };
+
+    window.addEventListener('user-absence-detected', handleUserAbsence as EventListener);
+
+    const interval = setInterval(() => {
+      const detectionState = detectionCounts.current;
+      
+      const isUserAbsent = 
+        detectionState.userabsence === true ||
+        detectionState.userAbsence === true ||
+        detectionState.nofacedetected === true ||
+        detectionState.noFaceDetected === true ||
+        detectionState.face_absent === true ||
+        detectionState.faceAbsent === true ||
+        detectionState.absence_detected === true ||
+        detectionState.absenceDetected === true ||
+        (detectionState.face_detected === false) ||
+        (detectionState.faceDetected === false);
+
+      const currentTime = Date.now();
+
+      if (isUserAbsent) {
+        if (noFaceDetectedStartTime.current === null) {
+          noFaceDetectedStartTime.current = currentTime;
+          hasPreCaptured.current = false;
+        } else {
+          const absenceDuration = currentTime - noFaceDetectedStartTime.current;
+          const timeSinceLastCapture = currentTime - lastAbsenceCaptureTime.current;
+          
+          if (
+            absenceDuration >= 100 && 
+            !hasPreCaptured.current && 
+            userAbsenceCaptureCount.current < MAX_CAPTURES &&
+            (timeSinceLastCapture >= MIN_CAPTURE_INTERVAL || lastAbsenceCaptureTime.current === 0)
+          ) {
+            captureAndUpload("userabsenceFromCamera");
+            userAbsenceCaptureCount.current++;
+            prevUserAbsenceCount.current++;
+            hasPreCaptured.current = true;
+            lastFaceDetectionState.current = true;
+            lastAbsenceCaptureTime.current = currentTime;
+          }
+        }
+      } else {
+        if (noFaceDetectedStartTime.current !== null) {
+          noFaceDetectedStartTime.current = null;
+          lastFaceDetectionState.current = false;
+          hasPreCaptured.current = false;
+        }
+      }
+    }, 500);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('user-absence-detected', handleUserAbsence as EventListener);
+    };
+  }, [isInterviewStarted, isRecording, interviewCompleted]);
+
+  useEffect(() => {
+    if (!isInterviewStarted || !isRecording || interviewCompleted) return;
+
+    const currentAbsenceDetectionCount = 
+      detectionCounts.current.userabsencecount ||
+      detectionCounts.current.user_absence_count ||
+      detectionCounts.current.absencecount ||
+      detectionCounts.current.absence_count ||
+      detectionCounts.current.nofacecount ||
+      detectionCounts.current.no_face_count ||
+      0;
+
+    if (currentAbsenceDetectionCount > prevUserAbsenceCount.current && userAbsenceCaptureCount.current < MAX_CAPTURES) {
+      const now = Date.now();
+      const timeSinceLastCapture = now - lastAbsenceCaptureTime.current;
+
+      if (timeSinceLastCapture >= MIN_CAPTURE_INTERVAL || lastAbsenceCaptureTime.current === 0) {
+        captureAndUpload("userabsenceFromCamera");
+        userAbsenceCaptureCount.current++;
+        lastAbsenceCaptureTime.current = now;
+      }
+      
+      prevUserAbsenceCount.current = currentAbsenceDetectionCount;
+    }
+  }, [
+    detectionCounts.current.userabsencecount,
+    detectionCounts.current.user_absence_count,
+    detectionCounts.current.absencecount,
+    detectionCounts.current.absence_count,
+    detectionCounts.current.nofacecount,
+    detectionCounts.current.no_face_count,
+    isInterviewStarted,
+    isRecording,
+    interviewCompleted
+  ]);
 
   const clearStorage = async () => {
     try {
@@ -1504,6 +1729,8 @@ const useQuestionsHook = ({
 
   const startSubmittingInterview = async () => {
     try {
+      isSubmittingRef.current = true;
+      setSubmittingInterview(true);
       if (interviewCompleted) return;
 
       stopBotAudioRecording();
@@ -1526,7 +1753,6 @@ const useQuestionsHook = ({
         timeIntervals: updatedTimeIntervals,
       }));
 
-      setSubmittingInterview(true);
       const lastQuestionTime = dayjs().toISOString();
       let questionAns = questionsWithTimeStamps;
 
@@ -1591,9 +1817,21 @@ const useQuestionsHook = ({
           ) * 100
         ) / 100;
 
-      let imageFileKey = fileKeysRef.current.length > 0 ? fileKeysRef.current[fileKeysRef.current.length - 1] : null;
-
       const { eyeTimeIntervals } = detectionCounts.current;
+
+      let bestFileKey = null;
+      for (let i = fileKeysRef.current.length - 1; i >= 0; i--) {
+        if (fileKeysRef.current[i] && fileKeysRef.current[i].includes('absence')) {
+          bestFileKey = fileKeysRef.current[i];
+          break;
+        }
+      }
+      
+      if (!bestFileKey && fileKeysRef.current.length > 0) {
+        bestFileKey = fileKeysRef.current[fileKeysRef.current.length - 1];
+      }
+      
+      const screenshotPayload = bestFileKey ? { candidate_screenshots_path: bestFileKey } : {}; 
 
       const payload = {
         duration: Math.abs(Math.ceil(totalDurationInMins)),
@@ -1607,27 +1845,26 @@ const useQuestionsHook = ({
             : questionAns.filter((qtn) => qtn.qtn && qtn.id).length,
         proctoring_activity_count: {
           tab_switching_count: counts.leaveCount,
+          user_absence_count: userAbsenceCaptureCount.current,
           disable_cam_count: counts.video,
           disable_mic_count: counts.audio,
           total_tab_switching_time: totalTabSwitchingTime,
           total_camera_disabling_time: totalCameraDisablingTime,
           total_mic_muting_time: totalMicMutingTime,
-          eye_right_count: detectionCounts.current.eye_right_count,
-          eye_left_count: detectionCounts.current.eye_left_count,
-          eye_up_count: detectionCounts.current.eye_up_count,
-          eye_down_count: detectionCounts.current.eye_down_count,
-          total_eye_right_time: calculateTotalEyeTime(eyeTimeIntervals.right),
-          total_eye_left_time: calculateTotalEyeTime(eyeTimeIntervals.left),
-          total_eye_up_time: calculateTotalEyeTime(eyeTimeIntervals.up),
-          total_eye_down_time: calculateTotalEyeTime(eyeTimeIntervals.down),
+          eye_right_count: detectionCounts.current.eyerightcount || detectionCounts.current.eye_right_count || 0,
+          eye_left_count: detectionCounts.current.eyeleftcount || detectionCounts.current.eye_left_count || 0,
+          eye_up_count: detectionCounts.current.eye_up_count || 0,
+          eye_down_count: detectionCounts.current.eye_down_count || 0,
+          total_eye_right_time: calculateTotalEyeTime(eyeTimeIntervals?.right || []),
+          total_eye_left_time: calculateTotalEyeTime(eyeTimeIntervals?.left || []),
+          total_eye_up_time: calculateTotalEyeTime(eyeTimeIntervals?.up || []),
+          total_eye_down_time: calculateTotalEyeTime(eyeTimeIntervals?.down || []),
           multiple_face_detected: multiFaceDetectionCount.current >= 1,
           multiple_face_detected_count: multiFaceDetectionCount.current,
           multiple_face_detected_time: calculateMultiFaceTime(),
         },
         meeting_room_id: meetingId,
-        ...(imageFileKey !== null && {
-          candidate_screenshots_path: imageFileKey,
-        }),
+        ...screenshotPayload,
       };
 
 
@@ -1661,12 +1898,82 @@ const useQuestionsHook = ({
       setSubmitError(true);
       errPopper(err);
     } finally {
+      isSubmittingRef.current = false;
       setSubmittingInterview(false);
     }
   };
 
+  const playConclude = async (): Promise<void> => {
+    if (concludeStartedRef.current) {
+      return;
+    }
+    concludeStartedRef.current = true;
+
+    setIsInterviewCompleted(true);
+
+    if (
+      questionsWithTimeStamps.length > 0 &&
+      !questionsWithTimeStamps[questionsWithTimeStamps.length - 1].end_time
+    ) {
+      const updated = [...questionsWithTimeStamps];
+      const endTime = dayjs().toISOString();
+      updated[updated.length - 1].end_time = endTime;
+      const duration = ((new Date(endTime).getTime() - new Date(updated[updated.length - 1].start_time).getTime()) / 1000).toFixed(2);
+      setQuestionsWithTimeStamps(updated);
+    }
+
+    setShowNextButtonOrNot(false);
+
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    try {
+      const audio = new Audio();
+      const introData: any = await getItemByIdIntroConclude(1, "intro_conclude");
+
+      if (!introData?.data?.conclude_blob) {
+        throw new Error("Conclude audio blob not found");
+      }
+
+      audio.src = URL.createObjectURL(introData.data.conclude_blob as Blob);
+
+      let concludeAudioTime = await getDuration(interviewData?.conclude_dailog_audio_url);
+      setBotSpeechDuration(concludeAudioTime as number);
+
+      const isIOSDevice = isIOS();
+      
+      if (isIOSDevice) {
+        setBotSpeechRendered(false);
+        setRenderTypeWriter(false);
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        setRenderTypeWriter(true);
+        setBotSpeechRendered(true);
+      } else {
+        setBotSpeechRendered(false);
+        setRenderTypeWriter(false);
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        setRenderTypeWriter(true);
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        setBotSpeechRendered(true);
+      }
+
+      await playWithInjection(audio);
+
+      setTimeout(() => {
+        if (!isSubmittingRef.current && !interviewCompleted && !submittingInterview) {
+          startSubmittingInterview();
+        }
+      }, (concludeAudioTime as number) * 1000);
+    } catch (error) {
+      if (!isSubmittingRef.current && !interviewCompleted && !submittingInterview) {
+        startSubmittingInterview();
+      }
+    }
+  };
+
   const submitInterviewForTesting = () => {
-    startSubmittingInterview();
+    if (!isSubmittingRef.current && !interviewCompleted && !submittingInterview) {
+      startSubmittingInterview();
+    }
   };
 
   const submitStoredInterview = () => {
@@ -1709,6 +2016,8 @@ const useQuestionsHook = ({
 
       const startSubmittingInterview2 = async () => {
         try {
+          isSubmittingRef.current = true;
+          setSubmittingInterview(true);
           if (interviewCompleted) return;
           stopBotAudioRecording();
           const now = Date.now();
@@ -1729,7 +2038,6 @@ const useQuestionsHook = ({
             timeIntervals: updatedTimeIntervals,
           }));
 
-          setSubmittingInterview(true);
           const lastQuestionTime = dayjs().toISOString();
 
           const firstQuesStartTime = allQuestions[0].start_time;
@@ -1763,7 +2071,20 @@ const useQuestionsHook = ({
             ) / 100;
 
           const { eyeTimeIntervals } = detectionCounts.current;
-          let imageFileKey = fileKeysRef.current.length > 0 ? fileKeysRef.current[fileKeysRef.current.length - 1] : null;
+          
+          let bestFileKey = null;
+          for (let i = fileKeysRef.current.length - 1; i >= 0; i--) {
+            if (fileKeysRef.current[i] && fileKeysRef.current[i].includes('absence')) {
+              bestFileKey = fileKeysRef.current[i];
+              break;
+            }
+          }
+          
+          if (!bestFileKey && fileKeysRef.current.length > 0) {
+            bestFileKey = fileKeysRef.current[fileKeysRef.current.length - 1];
+          }
+          
+          const screenshotPayload = bestFileKey ? { candidate_screenshots_path: bestFileKey } : {};
 
           const payload = {
             duration: Math.abs(Math.ceil(totalDurationInMins)),
@@ -1783,27 +2104,26 @@ const useQuestionsHook = ({
             total_qtns: allQuestions.filter((qtn) => qtn.qtn && qtn.id).length,
             proctoring_activity_count: {
               tab_switching_count: counts.leaveCount,
+              user_absence_count: userAbsenceCaptureCount.current,
               disable_cam_count: counts.video,
               disable_mic_count: counts.audio,
               total_tab_switching_time: totalTabSwitchingTime,
               total_camera_disabling_time: totalCameraDisablingTime,
               total_mic_muting_time: totalMicMutingTime,
-              eye_right_count: detectionCounts.current.eye_right_count,
-              eye_left_count: detectionCounts.current.eye_left_count,
-              eye_up_count: detectionCounts.current.eye_up_count,
-              eye_down_count: detectionCounts.current.eye_down_count,
-              total_eye_right_time: calculateTotalEyeTime(eyeTimeIntervals.right),
-              total_eye_left_time: calculateTotalEyeTime(eyeTimeIntervals.left),
-              total_eye_up_time: calculateTotalEyeTime(eyeTimeIntervals.up),
-              total_eye_down_time: calculateTotalEyeTime(eyeTimeIntervals.down),
+              eye_right_count: detectionCounts.current.eyerightcount || detectionCounts.current.eye_right_count || 0,
+              eye_left_count: detectionCounts.current.eyeleftcount || detectionCounts.current.eye_left_count || 0,
+              eye_up_count: detectionCounts.current.eye_up_count || 0,
+              eye_down_count: detectionCounts.current.eye_down_count || 0,
+              total_eye_right_time: calculateTotalEyeTime(eyeTimeIntervals?.right || []),
+              total_eye_left_time: calculateTotalEyeTime(eyeTimeIntervals?.left || []),
+              total_eye_up_time: calculateTotalEyeTime(eyeTimeIntervals?.up || []),
+              total_eye_down_time: calculateTotalEyeTime(eyeTimeIntervals?.down || []),
               multiple_face_detected: multiFaceDetectionCount.current >= 1,
               multiple_face_detected_count: multiFaceDetectionCount.current,
               multiple_face_detected_time: calculateMultiFaceTime(),
             },
             meeting_room_id: meetingId,
-            ...(imageFileKey !== null && {
-              candidate_screenshots_path: imageFileKey,
-            }),
+            ...screenshotPayload,
           };
 
 
@@ -1837,11 +2157,14 @@ const useQuestionsHook = ({
           setSubmitError(true);
           errPopper(err);
         } finally {
+          isSubmittingRef.current = false;
           setSubmittingInterview(false);
         }
       };
 
-      startSubmittingInterview2();
+      if (!isSubmittingRef.current && !interviewCompleted && !submittingInterview) {
+        startSubmittingInterview2();
+      }
     }
   };
 
@@ -1929,10 +2252,12 @@ const useQuestionsHook = ({
 
   useEffect(() => {
     if (endCall || isDurationCompleted) {
-      if (interviewType === "MCQ") {
-        submitInterviewForTesting();
-      } else {
-        submitStoredInterview();
+      if (!isSubmittingRef.current && !interviewCompleted && !submittingInterview) {
+        if (interviewType === "MCQ") {
+          submitInterviewForTesting();
+        } else {
+          submitStoredInterview();
+        }
       }
     }
   }, [endCall, currentStage, isRecording, isDurationCompleted]);

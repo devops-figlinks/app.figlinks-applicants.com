@@ -65,8 +65,10 @@ const MobileBottomActionBarInMeeting: FC<IMobileBottomActionBarInMeeting> = ({
 
     if (submitError && submitInterviewForTesting && retryCount < maxRetries) {
       const timer = setTimeout(() => {
-        submitInterviewForTesting();
-        setRetryCount((prev) => prev + 1);
+        if (submitInterviewForTesting) {
+          submitInterviewForTesting();
+          setRetryCount((prev) => prev + 1);
+        }
       }, retryDelay);
       return () => clearTimeout(timer);
     }
@@ -162,7 +164,11 @@ const MobileBottomActionBarInMeeting: FC<IMobileBottomActionBarInMeeting> = ({
           <Button
             className="bg-gradient-to-r from-[#430ca6] via-[#a533cf] to-[#ec6d78] text-white p-2 rounded-lg"
             variant="default"
-            onClick={submitInterviewForTesting}
+             onClick={() => {
+              if (submitInterviewForTesting) {
+                submitInterviewForTesting();
+              }
+            }}
           >
             Submit
           </Button>
