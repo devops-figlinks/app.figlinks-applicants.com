@@ -633,7 +633,16 @@ const useMeetingHook = ({
         const currentQuestion = questions[questionNo];
         const hasTimer = currentQuestion && Number(currentQuestion.time_limit) > 0;
         if (timer == 10 && !hasTimer && !isIOS()) {
-          startTheNextQuestion();
+          // Add protection to prevent double triggering with useQuestionsHook timer
+          if (typeof window !== 'undefined' && !(window as any).questionProgressionInProgress) {
+            (window as any).questionProgressionInProgress = true;
+            startTheNextQuestion();
+            setTimeout(() => {
+              if (typeof window !== 'undefined') {
+                (window as any).questionProgressionInProgress = false;
+              }
+            }, 1000);
+          }
         } else {
           let timerValue = timer + 1;
           setTimer(timerValue);

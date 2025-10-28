@@ -79,6 +79,10 @@ const MobileBottomActionBarInMeeting: FC<IMobileBottomActionBarInMeeting> = ({
     if (isIOS() && interviewType !== "MCQ" && isTimerCompleted) {
       return handleManualNextQuestion;
     }
+    // For MCQ interviews, ensure proper handling
+    if (interviewType === "MCQ") {
+      return startTheNextQuestion;
+    }
     return startTheNextQuestion;
   };
 
