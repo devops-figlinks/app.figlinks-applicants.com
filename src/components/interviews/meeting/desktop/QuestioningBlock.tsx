@@ -47,13 +47,19 @@ const QuestioningBlock: FC<IQuestioningBlock> = (props) => {
         <header className="border-b border-[#dadada] pb-2">
           <div className="flex items-center gap-2 justify-between">
             <div className="flex items-center gap-2">
-              <Image alt="" src="/interviews/sparkleimage.svg" height={15} width={15} />
+              <Image
+                alt=""
+                src="/interviews/sparkleimage.svg"
+                height={15}
+                width={15}
+              />
               <p className="text-base">Questions</p>
             </div>
             {remainingTime > 0 && isRecording && timer1 && (
               <div
-                className={`flex items-center gap-1 text-[13px] 3xl:!text-base font-medium leading-[100%] capitalize m-0 ${remainingTime < 10 ? "text-[#ff6347]" : "text-black"
-                  }`}
+                className={`flex items-center gap-1 text-[13px] 3xl:!text-base font-medium leading-[100%] capitalize m-0 ${
+                  remainingTime < 10 ? "text-[#ff6347]" : "text-black"
+                }`}
               >
                 <Image
                   src="/interviews/timer-icon2.svg"
@@ -61,7 +67,11 @@ const QuestioningBlock: FC<IQuestioningBlock> = (props) => {
                   width="16"
                   height={16}
                 />
-                <span style={{ fontSize: "13px", color: timerColor(remainingTime) }}>{getMinAndSecsFromSecs(remainingTime)} secs</span>
+                <span
+                  style={{ fontSize: "13px", color: timerColor(remainingTime) }}
+                >
+                  {getMinAndSecsFromSecs(remainingTime)} secs
+                </span>
               </div>
             )}
           </div>
@@ -95,10 +105,11 @@ const QuestioningBlock: FC<IQuestioningBlock> = (props) => {
           <div className="flex items-center justify-end gap-4">
             {questions.length && !isInterviewComplete ? (
               <Button
-                className={`w-18 h-7 p-1 rounded-sm border-none leading-none capitalize text-sm 3xl:!text-base font-medium md:px-2.5 md:text-[14px] shadow-none ${showNextButtonOrNot
-                    ? "active text-[#a533cf] bg-[rgba(165,51,207,.2)] cursor-pointer"
-                    : "inactive bg-gray-300 text-black/60"
-                  }`}
+                className={`w-18 h-7 p-1 rounded-sm border-none leading-none capitalize text-sm 3xl:!text-base font-medium md:px-2.5 md:text-[14px] shadow-none ${
+                  showNextButtonOrNot
+                    ? "text-[#a533cf] bg-[rgba(165,51,207,.2)] cursor-pointer hover:text-[#a533cf] hover:bg-[rgba(165,51,207,.2)]"
+                    : "bg-gray-300 text-black/60"
+                }`}
                 variant="ghost"
                 onClick={startTheNextQuestion}
                 disabled={!showNextButtonOrNot}
@@ -113,7 +124,11 @@ const QuestioningBlock: FC<IQuestioningBlock> = (props) => {
               <Button
                 className="px-8 py-2 rounded-sm bg-gradient-to-r from-[#430ca6] via-[#a533cf] to-[#ec6d78] shadow-[0_0_24px_0_rgba(153,23,255,0.1),0_0_1px_4px_rgba(255,255,255,0.1)] text-white leading-none capitalize font-primary text-sm 3xl:!text-base font-medium md:px-2.5 md:text-[14px] cursor-pointer"
                 variant="default"
-                onClick={submitInterviewForTesting}
+                onClick={() => {
+                  if (submitInterviewForTesting) {
+                    submitInterviewForTesting();
+                  }
+                }}
               >
                 {"Submit"}
               </Button>

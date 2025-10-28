@@ -121,7 +121,9 @@ export const useMcqMeetingHook = (props: IMcqExamBlock & IQuestioningBlock) => {
         lastQuestionTime: now,
       }));
     }
-    submitInterviewForTesting();
+      if (submitInterviewForTesting) {
+            submitInterviewForTesting();
+        }
   };
   return {
     currentStage,

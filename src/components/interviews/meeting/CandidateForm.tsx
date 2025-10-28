@@ -47,14 +47,14 @@ const CandidateForm: FC<ICandidateForm> = ({
         >
           <Card className="border-none rounded-2xl relative z-10 bg-white shadow-[6px_-3px_9px_rgba(0,0,0,0.08),-3px_13px_16px_rgba(0,0,0,0.15)] backdrop-blur-md px-5 py-4">
             <CardHeader className="p-0">
-              <p className="text-lg 3xl:!text-xl font-medium text-black capitalize mb-2">
+              <p className="text-lg 3xl:!text-xl font-medium text-black capitalize">
                 Register to take interview
               </p>
               <p className="text-xs 3xl:!text-sm font-medium text-[#000000cc] capitalize leading-tight">
                 Please fill in your details to get started with the interview process.
               </p>
             </CardHeader>
-            <div className="flex items-start justify-between mt-8 gap-4 max-[767px]:hidden">
+            <div className="flex items-start justify-between gap-4 max-[767px]:hidden">
               <div className="flex flex-col">
                 <div className="bg-gradient-to-r from-[#430ca6] via-[#a533cf] to-[#ec6d78] bg-clip-text text-transparent text-lg 3xl:!text-xl font-medium capitalize mb-4">
                   {interviewData?.interview?.[0]?.title}
@@ -90,7 +90,7 @@ const CandidateForm: FC<ICandidateForm> = ({
               </div>
             </div>
             <div className="hidden max-[767px]:block">
-              <div className="bg-gradient-to-r from-[#430ca6] via-[#a533cf] to-[#ec6d78] bg-clip-text text-transparent text-xl 3xl:!text-2xl font-medium capitalize mb-4">
+              <div className="bg-gradient-to-r from-[#430ca6] via-[#a533cf] to-[#ec6d78] bg-clip-text text-transparent text-xl 3xl:!text-2xl font-medium capitalize">
                 {interviewData?.interview?.[0]?.title}
               </div>
               {interviewData?.company?.logo ? (
@@ -120,7 +120,7 @@ const CandidateForm: FC<ICandidateForm> = ({
                 />
               )}
             </div>
-            <CardContent className="p-0 mt-6">
+            <CardContent className="p-0">
               <form className="flex flex-col">
                 <div className="grid grid-cols-2 gap-4 max-[767px]:grid-cols-1 max-[767px]:gap-y-3">
                   <div className="flex flex-col gap-1">
@@ -197,7 +197,7 @@ const CandidateForm: FC<ICandidateForm> = ({
                 </div>
               </form>
             </CardContent>
-            <CardFooter className="p-2 mt-6 flex items-center justify-center">
+            <CardFooter className="p-2 flex items-center justify-center">
               <p className="text-xs 3xl:!text-sm font-normal text-[#00000099] text-center leading-tight">
                 By clicking “Submit” I agree to FigLinks
                 <span className="underline"> Terms of Use</span>,

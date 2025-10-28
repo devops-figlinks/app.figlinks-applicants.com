@@ -75,8 +75,6 @@ const useParticipantHook = (
   const [processedStream, setProcessedStream] = useState(null);
   const [processedData, setProcessedData] = useState<any>({});
   const [firstAlert, setFirstAlert] = useState<boolean>(false);
-  const [isProcessingFaceDetection, setIsProcessingFaceDetection] = useState(false);
-
   useEffect(() => {
     if (pathname) {
       const pathSegments = pathname.split("/");
@@ -118,8 +116,6 @@ const useParticipantHook = (
       leaveCount: leaveCount,
       video: video,
       audio: audio,
-
-
       browser: navigator.userAgent,
       platform: navigator.platform,
       language: navigator.language,
@@ -318,18 +314,14 @@ const useParticipantHook = (
     }
   };
 
- const videoStream = useMemo<MediaStream | undefined>(() => {
-  if (webcamOn && webcamStream) {
-    const ms = new MediaStream();
-    ms.addTrack(webcamStream.track);
-    return ms;
-  }
-  return undefined;
-}, [webcamStream, webcamOn, joined]);
-
-useEffect(() => {
-  setIsWebcamOnInMeeting(webcamOn);
-}, [webcamOn, setIsWebcamOnInMeeting]);
+  const videoStream = useMemo(() => {
+    if (webcamOn && webcamStream) {
+      const mediaStream = new MediaStream();
+      mediaStream.addTrack(webcamStream.track);
+      return mediaStream;
+    }
+    setIsWebcamOnInMeeting(webcamOn);
+  }, [webcamStream, webcamOn, joined]);
 
   const onCamTrigger = async () => {
     // takeSS()
@@ -450,6 +442,7 @@ useEffect(() => {
   const faceDetectionProcessor = useMemo(() => {
     return new FaceDetectionProcessor();
   }, []);
+
   useEffect(() => {
     const handleStartFaceDetection = async () => {
       if (videoStream) {
@@ -542,8 +535,16 @@ useEffect(() => {
 
     if (!processedData?.faceDetected || processedData.faceDetected === 0) {
       detectionCounts.current.lastFaceCount = 0;
+
+      detectionCounts.current.no_face_detected = true;
+      detectionCounts.current.face_detected = false;
+
       return;
     }
+
+    detectionCounts.current.no_face_detected = false;
+    detectionCounts.current.face_detected = true;
+
     const faceCount = processedData.faceDetected;
     const multiFacesThreshold = 1;
     const multiFaces = faceCount > multiFacesThreshold ? faceCount : 1;
@@ -641,6 +642,15 @@ useEffect(() => {
   useEffect(() => {
     if (!exceededThirtySeconds || isInterviewComplete || !isRecording || (interviewType === "MCQ" && currentStage != "questions")) return;
     if (isRecording && videoStream === undefined) return;
+
+    const userAbsenceEvent = new CustomEvent('user-absence-detected', {
+      detail: {
+        timestamp: Date.now(),
+        message: "User absence detected"
+      }
+    });
+    window.dispatchEvent(userAbsenceEvent);
+
     warningPopper("Keep your face visible, or the interview will submit automatically")
 
     setCounts((prevCounts) => {
@@ -652,6 +662,14 @@ useEffect(() => {
     });
 
     intervalRef.current = setInterval(() => {
+      const userAbsenceEvent = new CustomEvent('user-absence-detected', {
+        detail: {
+          timestamp: Date.now(),
+          message: "User absence detected"
+        }
+      });
+      window.dispatchEvent(userAbsenceEvent);
+
       warningPopper("Keep your face visible, or the interview will submit automatically");
 
       setCounts((prevCounts) => {
@@ -666,7 +684,7 @@ useEffect(() => {
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
-        intervalRef.current = null
+        intervalRef.current = null;
       }
     };
   }, [exceededThirtySeconds, isRecording, videoStream]);
@@ -694,11 +712,7 @@ useEffect(() => {
       }
     };
   }, [videoStream, isRecording]);
-
-
-
-
-
+  
   return {
     webcamOn,
     webcamStream,
