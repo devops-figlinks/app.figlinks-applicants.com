@@ -136,6 +136,7 @@ const useQuestionsHook = ({
   const lastEyeCaptureTime = useRef<number>(0);
   const lastMultiFaceCaptureTime = useRef<number>(0);
   const lastAbsenceCaptureTime = useRef<number>(0);
+  const lastDisableCamCaptureTime = useRef<number>(0);
 
   const prevEyeLeftCount = useRef(0);
   const prevEyeRightCount = useRef(0);
@@ -1304,9 +1305,22 @@ const useQuestionsHook = ({
       video.muted = true;
       video.playsInline = true;
 
+      let resolved = false;
+      const safeResolve = (value: { fileName: string; base64: string } | null) => {
+        if (!resolved) {
+          resolved = true;
+          try {
+            video.pause();
+            video.srcObject = null;
+          } catch (e) {
+            console.warn("Error cleaning up video element:", e);
+          }
+          resolve(value);
+        }
+      };
+
       const onError = () => {
-        video.srcObject = null;
-        resolve(null);
+        safeResolve(null);
       };
 
       video.addEventListener("error", onError);
@@ -1318,21 +1332,39 @@ const useQuestionsHook = ({
         const maxCaptureAttempts = 5;
 
         const drawFrame = () => {
+          if (resolved) return;
+          
           if (video.readyState >= 2) {
-            const canvas = document.createElement("canvas");
-            canvas.width = Math.min(video.videoWidth || 640, 1920);
-            canvas.height = Math.min(video.videoHeight || 480, 1080);
-            const ctx = canvas.getContext("2d");
-            if (ctx && video.videoWidth > 0 && video.videoHeight > 0) {
-              ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-              const base64 = canvas.toDataURL("image/jpeg", 0.8);
-              const timestamp = Date.now();
-              const fileName = `screenshot_${timestamp}.jpg`;
-              video.pause();
-              video.srcObject = null;
-              video.removeEventListener("error", onError);
-              resolve({ fileName, base64 });
-              return;
+            try {
+              const canvas = document.createElement("canvas");
+              const maxWidth = 1280;
+              const maxHeight = 720;
+              const videoWidth = video.videoWidth || 640;
+              const videoHeight = video.videoHeight || 480;
+              
+              let canvasWidth = videoWidth;
+              let canvasHeight = videoHeight;
+              
+              if (canvasWidth > maxWidth || canvasHeight > maxHeight) {
+                const scale = Math.min(maxWidth / canvasWidth, maxHeight / canvasHeight);
+                canvasWidth = Math.floor(canvasWidth * scale);
+                canvasHeight = Math.floor(canvasHeight * scale);
+              }
+              
+              canvas.width = canvasWidth;
+              canvas.height = canvasHeight;
+              
+              const ctx = canvas.getContext("2d");
+              if (ctx && canvasWidth > 0 && canvasHeight > 0) {
+                ctx.drawImage(video, 0, 0, canvasWidth, canvasHeight);
+                const base64 = canvas.toDataURL("image/jpeg", 0.8);
+                const timestamp = Date.now();
+                const fileName = `screenshot_${timestamp}.jpg`;
+                safeResolve({ fileName, base64 });
+                return;
+              }
+            } catch (e) {
+              console.error("Error capturing frame:", e);
             }
           }
 
@@ -1340,10 +1372,7 @@ const useQuestionsHook = ({
           if (captureAttempts < maxCaptureAttempts) {
             requestAnimationFrame(drawFrame);
           } else {
-            video.pause();
-            video.srcObject = null;
-            video.removeEventListener("error", onError);
-            resolve(null);
+            safeResolve(null);
           }
         };
 
@@ -1351,10 +1380,8 @@ const useQuestionsHook = ({
       });
 
       setTimeout(() => {
-        video.srcObject = null;
-        video.removeEventListener("error", onError);
-        resolve(null);
-      }, 3000);
+        safeResolve(null);
+      }, 500);
     });
   };
 
@@ -1417,59 +1444,15 @@ const useQuestionsHook = ({
 
   const captureAndUpload = async (captureType: string) => {
     try {
-
-      const isAbsenceCapture = captureType.includes("absence");
-
+    
       const imageData = await captureImage();
       if (!imageData) {
-        if (isAbsenceCapture) {
-          for (let i = 0; i < 3; i++) {
-            await new Promise(resolve => setTimeout(resolve, 250));
-            const retryImageData = await captureImage();
-            if (retryImageData) {
-              const result = await uploadImageData(retryImageData, captureType);
-              if (result) {
-                return result;
-              }
-            }
-          }
-        }
         return;
       }
 
       const result = await uploadImageData(imageData, captureType);
-      if (!result && isAbsenceCapture) {
-        for (let i = 0; i < 3; i++) {
-          await new Promise(resolve => setTimeout(resolve, 250));
-          const retryImageData = await captureImage();
-          if (retryImageData) {
-            const retryResult = await uploadImageData(retryImageData, captureType);
-            if (retryResult) {
-              return retryResult;
-            }
-          }
-        }
-      }
-
       return result;
     } catch (error) {
-      const isAbsenceCapture = captureType.includes("absence");
-      if (isAbsenceCapture) {
-        try {
-          for (let i = 0; i < 3; i++) {
-            await new Promise(resolve => setTimeout(resolve, 500));
-            const imageData = await captureImage();
-            if (imageData) {
-              const result = await uploadImageData(imageData, captureType);
-              if (result) {
-                return result;
-              }
-            }
-          }
-        } catch (retryError) {
-          console.error("Retry failed for captureAndUpload:", retryError);
-        }
-      }
     }
   };
 
@@ -1514,12 +1497,16 @@ const useQuestionsHook = ({
       lastEyeCaptureTime.current = 0;
       lastMultiFaceCaptureTime.current = 0;
       lastAbsenceCaptureTime.current = 0;
+      lastDisableCamCaptureTime.current = 0;
       fileKeysRef.current = [];
       multiFaceIntervalRef.current = [];
       userAbsenceIntervalRef.current = [];
       if (detectionCounts.current) {
         detectionCounts.current.multiple_face_detected_count = 0;
       }
+    }
+    else {
+      multiFaceDetectionCount.current = detectionCounts.current?.multiple_face_detected_count || 0;
     }
   }, [questionNo, isInterviewStarted, isRecording, interviewCompleted, questions.length]);
 
@@ -1585,25 +1572,21 @@ const useQuestionsHook = ({
         (detectionState.faceCount && detectionState.faceCount > 1) ||
         (detectionState.lastFaceCount && detectionState.lastFaceCount > 1);
 
-
-      if (isMultiFaceDetected) {
-        if (!currentMultiFaceState.current) {
-          currentMultiFaceState.current = true;
-
-          if (multiFaceCaptureCount.current < MAX_CAPTURES) {
-            const timeSinceLastCapture = now - lastMultiFaceCaptureTime.current;
-
-            if (lastMultiFaceCaptureTime.current === 0 || timeSinceLastCapture >= MIN_CAPTURE_INTERVAL) {
-              multiFaceCaptureCount.current++;
-              lastMultiFaceCaptureTime.current = now;
-              captureAndUpload('multifacedetection');
-            }
-          }
+      const previousMultiFaceCount = multiFaceDetectionCount.current;
+      const currentMultiFaceCount = detectionState.multiple_face_detected_count || 0;
+      
+      if (currentMultiFaceCount > previousMultiFaceCount && multiFaceCaptureCount.current < MAX_CAPTURES) {
+        const timeSinceLastCapture = now - lastMultiFaceCaptureTime.current;
+        
+        if (lastMultiFaceCaptureTime.current === 0 || timeSinceLastCapture >= MIN_CAPTURE_INTERVAL) {
+          multiFaceCaptureCount.current++;
+          lastMultiFaceCaptureTime.current = now;
+          multiFaceDetectionCount.current = currentMultiFaceCount;
+          captureAndUpload('multifacedetection');
         }
       }
-      else if (currentMultiFaceState.current) {
-        currentMultiFaceState.current = false;
-      }
+      
+      multiFaceDetectionCount.current = currentMultiFaceCount;
 
       const intervals = multiFaceIntervalRef.current;
 
@@ -1686,9 +1669,9 @@ const useQuestionsHook = ({
 
     if (counts.video > 0 && disableCamCaptureCount.current < MAX_CAPTURES) {
       const now = Date.now();
-      if (disableCamCaptureCount.current === 0 || now - lastMultiFaceCaptureTime.current >= MIN_CAPTURE_INTERVAL) {
+      if (disableCamCaptureCount.current === 0 || now - lastDisableCamCaptureTime.current >= MIN_CAPTURE_INTERVAL) {
         disableCamCaptureCount.current++;
-        lastMultiFaceCaptureTime.current = now;
+        lastDisableCamCaptureTime.current = now;
         captureAndUpload('disableCam');
       }
     }
