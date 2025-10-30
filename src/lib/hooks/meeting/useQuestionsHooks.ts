@@ -116,6 +116,7 @@ const useQuestionsHook = ({
   const multiFaceCaptureCount = useRef(0);
   const eyeTransitionCaptureCount = useRef(0);
   const userAbsenceCaptureCount = useRef(0);
+  const disableCamCaptureCount = useRef(0);
 
   const multiFaceDetectionCount = useRef(0);
   const eyeTransitionDetectionCount = useRef(0);
@@ -1503,6 +1504,7 @@ const useQuestionsHook = ({
       multiFaceDetectionCount.current = 0;
       userAbsenceCaptureCount.current = 0;
       userAbsenceDetectionCount.current = 0;
+      disableCamCaptureCount.current = 0;
       prevEyeLeftCount.current = 0;
       prevEyeRightCount.current = 0;
       currentMultiFaceState.current = false;
@@ -1650,12 +1652,6 @@ const useQuestionsHook = ({
         userAbsenceDetectionCount.current++;
         currentUserAbsenceState.current = true;
 
-        if (userAbsenceCaptureCount.current < MAX_CAPTURES) {
-          userAbsenceCaptureCount.current++;
-          lastAbsenceCaptureTime.current = now;
-          captureAndUpload('userabsenceFromCamera');
-        }
-
         const intervals = userAbsenceIntervalRef.current;
         const lastInterval = intervals[intervals.length - 1];
         if (!lastInterval || lastInterval.endTime !== null) {
@@ -1677,6 +1673,26 @@ const useQuestionsHook = ({
 
     return () => clearInterval(interval);
   }, [isInterviewStarted, isRecording, interviewCompleted, questionsStarted.current]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [counts.video, isInterviewStarted, isRecording, interviewCompleted]);
+
+  useEffect(() => {
+    if (!isInterviewStarted || !isRecording || interviewCompleted) return;
+
+    if (counts.video > 0 && disableCamCaptureCount.current < MAX_CAPTURES) {
+      const now = Date.now();
+      if (disableCamCaptureCount.current === 0 || now - lastMultiFaceCaptureTime.current >= MIN_CAPTURE_INTERVAL) {
+        disableCamCaptureCount.current++;
+        lastMultiFaceCaptureTime.current = now;
+        captureAndUpload('disableCam');
+      }
+    }
+  }, [counts.video, isInterviewStarted, isRecording, interviewCompleted]);
 
   const calculateMultiFaceTime = (): number => {
     const intervals = multiFaceIntervalRef.current;
