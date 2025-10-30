@@ -120,12 +120,22 @@ export interface IDetectionCounts {
   multiple_face_detected: boolean;
   multiple_face_detected_count: number;
 
+  isLookingAway: boolean;
+  lastDirection: string | null;
+  lastFaceCount: number;
+  no_face_detected: boolean;
+  face_detected: boolean;
+
   eyeTimeIntervals: {
     left: Array<{ awayTime: number; inTime: number | null }>;
     right: Array<{ awayTime: number; inTime: number | null }>;
     up: Array<{ awayTime: number; inTime: number | null }>;
     down: Array<{ awayTime: number; inTime: number | null }>;
+    multiFaces: Array<{ awayTime: number; inTime: number | null }>;
   };
+
+  face_count?: number;
+  faceCount?: number;
 }
 
 export type QuestionAnswer = {
