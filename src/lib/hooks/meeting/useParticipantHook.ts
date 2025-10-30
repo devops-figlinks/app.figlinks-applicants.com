@@ -324,7 +324,6 @@ const useParticipantHook = (
   }, [webcamStream, webcamOn, joined]);
 
   const onCamTrigger = async () => {
-    // takeSS()
     if (cameraPermission == "granted") toggleWebcam();
 
 
@@ -553,14 +552,13 @@ const useParticipantHook = (
     if (multiFaces > multiFacesThreshold) {
 
       const awayTime = Date.now();
-      if (multiFaces !== detectionCounts.current.lastFaceCount) {
-        if (multiFaces > detectionCounts.current.lastFaceCount) {
-          detectionCounts.current.multiple_face_detected_count += 1;
-        }
+      if (!detectionCounts.current.multiple_face_detected) {
+        detectionCounts.current.multiple_face_detected_count += 1;
         detectionCounts.current.eyeTimeIntervals.multiFaces.push({ awayTime, inTime: null });
-        detectionCounts.current.lastFaceCount = multiFaces;
-        detectionCounts.current.multiple_face_detected = true;
       }
+      detectionCounts.current.lastFaceCount = multiFaces;
+      detectionCounts.current.multiple_face_detected = true;
+      
       if (!firstAlert) {
         warningPopper("Multiple faces detected");
         setFirstAlert(true)
