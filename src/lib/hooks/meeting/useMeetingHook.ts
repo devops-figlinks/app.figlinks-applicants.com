@@ -81,6 +81,9 @@ const useMeetingHook = ({
     multiple_face_detected_count: 0,
     isLookingAway: false,
     lastDirection: null,
+    lastFaceCount: 0,
+    no_face_detected: false,
+    face_detected: false,
     eyeTimeIntervals: {
       left: [],
       right: [],
@@ -633,7 +636,6 @@ const useMeetingHook = ({
         const currentQuestion = questions[questionNo];
         const hasTimer = currentQuestion && Number(currentQuestion.time_limit) > 0;
         if (timer == 10 && !hasTimer && !isIOS()) {
-          // Add protection to prevent double triggering with useQuestionsHook timer
           if (typeof window !== 'undefined' && !(window as any).questionProgressionInProgress) {
             (window as any).questionProgressionInProgress = true;
             startTheNextQuestion();
