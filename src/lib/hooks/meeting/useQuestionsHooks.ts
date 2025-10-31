@@ -140,6 +140,8 @@ const useQuestionsHook = ({
 
   const prevEyeLeftCount = useRef(0);
   const prevEyeRightCount = useRef(0);
+  const prevMultiFaceCount = useRef(0);
+  const prevCameraDisableCount = useRef(0);
 
   const MIN_CAPTURE_INTERVAL = 1000;
   const COOLDOWN_MS = 1000;
@@ -1444,15 +1446,52 @@ const useQuestionsHook = ({
 
   const captureAndUpload = async (captureType: string) => {
     try {
-    
+      const isAbsenceCapture = captureType.includes("absence");
+      
       const imageData = await captureImage();
       if (!imageData) {
+        if (isAbsenceCapture) {
+          for (let i = 0; i < 3; i++) {
+            await new Promise(resolve => setTimeout(resolve, 250));
+            const retryImageData = await captureImage();
+            if (retryImageData) {
+              const result = await uploadImageData(retryImageData, captureType);
+              if (result) return result;
+            }
+          }
+        }
         return;
       }
-
+      
       const result = await uploadImageData(imageData, captureType);
+      if (!result && isAbsenceCapture) {
+        for (let i = 0; i < 3; i++) {
+          await new Promise(resolve => setTimeout(resolve, 250));
+          const retryImageData = await captureImage();
+          if (retryImageData) {
+            const retryResult = await uploadImageData(retryImageData, captureType);
+            if (retryResult) return retryResult;
+          }
+        }
+      }
       return result;
     } catch (error) {
+      console.error("Error in captureAndUpload:", error);
+      const isAbsenceCapture = captureType.includes("absence");
+      if (isAbsenceCapture) {
+        try {
+          for (let i = 0; i < 3; i++) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+            const imageData = await captureImage();
+            if (imageData) {
+              const result = await uploadImageData(imageData, captureType);
+              if (result) return result;
+            }
+          }
+        } catch (retryError) {
+          console.error("Retry failed for captureAndUpload:", retryError);
+        }
+      }
     }
   };
 
@@ -1466,17 +1505,17 @@ const useQuestionsHook = ({
 
       if (questionNo === 0 && !fixedScreenshotFlags.current.start) {
         fixedScreenshotFlags.current.start = true;
-        captureAndUpload("fixedstart");
+        captureAndUpload("fixed_start");
       }
 
       if (questionNo === midPoint && !fixedScreenshotFlags.current.mid && totalQuestions > 1) {
         fixedScreenshotFlags.current.mid = true;
-        captureAndUpload("fixedmid");
+        captureAndUpload("fixed_mid");
       }
 
       if (questionNo === totalQuestions - 1 && !fixedScreenshotFlags.current.end) {
         fixedScreenshotFlags.current.end = true;
-        captureAndUpload("fixedend");
+        captureAndUpload("fixed_end");
       }
     }
 
@@ -1490,6 +1529,8 @@ const useQuestionsHook = ({
       disableCamCaptureCount.current = 0;
       prevEyeLeftCount.current = 0;
       prevEyeRightCount.current = 0;
+      prevMultiFaceCount.current = 0;
+      prevCameraDisableCount.current = 0;
       currentMultiFaceState.current = false;
       currentUserAbsenceState.current = false;
       noFaceDetectedStartTime.current = null;
@@ -1514,106 +1555,72 @@ const useQuestionsHook = ({
     if (!isInterviewStarted || !isRecording || interviewCompleted) return;
 
     const checkInterval = setInterval(() => {
-      const currentLeftCount =
-        detectionCounts.current.eye_left_count ||
-        detectionCounts.current.eyeLeftCount ||
-        detectionCounts.current.eyeleftcount ||
-        0;
-
-      const currentRightCount =
-        detectionCounts.current.eye_right_count ||
-        detectionCounts.current.eyeRightCount ||
-        detectionCounts.current.eyerightcount ||
-        0;
+      const currentLeftCount = detectionCounts.current.eye_left_count || 0;
+      const currentRightCount = detectionCounts.current.eye_right_count || 0;
 
       const leftIncreased = currentLeftCount > prevEyeLeftCount.current;
       const rightIncreased = currentRightCount > prevEyeRightCount.current;
 
-      if (leftIncreased) {
-        const delta = currentLeftCount - prevEyeLeftCount.current;
-        eyeTransitionDetectionCount.current += delta;
-      }
-
-      if (rightIncreased) {
-        const delta = currentRightCount - prevEyeRightCount.current;
-        eyeTransitionDetectionCount.current += delta;
-      }
-
-      if (questionsStarted.current && (leftIncreased || rightIncreased) && eyeTransitionCaptureCount.current < MAX_CAPTURES) {
+      if ((leftIncreased || rightIncreased) && eyeTransitionCaptureCount.current < MAX_CAPTURES) {
         const now = Date.now();
         const timeSinceLastCapture = now - lastEyeCaptureTime.current;
 
         if (timeSinceLastCapture >= MIN_CAPTURE_INTERVAL || lastEyeCaptureTime.current === 0) {
+          const direction = leftIncreased ? "left" : "right";
+          captureAndUpload(`eye_transition_${direction}`);
           eyeTransitionCaptureCount.current++;
           lastEyeCaptureTime.current = now;
-          captureAndUpload('eyetransition');
         }
       }
 
       prevEyeLeftCount.current = currentLeftCount;
       prevEyeRightCount.current = currentRightCount;
-    }, 300);
+    }, 500);
 
     return () => clearInterval(checkInterval);
-  }, [isInterviewStarted, isRecording, interviewCompleted, questionsStarted.current]);
+  }, [isInterviewStarted, isRecording, interviewCompleted]);
 
   useEffect(() => {
-    if (!questionsStarted.current || !isInterviewStarted || interviewCompleted) {
-      return;
-    }
+    if (!isInterviewStarted || !isRecording || interviewCompleted) return;
 
     const interval = setInterval(() => {
-      const detectionState = detectionCounts.current;
-      const now = Date.now();
+      const currentCount = detectionCounts.current.multiple_face_detected_count || 0;
 
-      const isMultiFaceDetected =
-        detectionState.multiple_face_detected === true ||
-        (detectionState.face_count && detectionState.face_count > 1) ||
-        (detectionState.faceCount && detectionState.faceCount > 1) ||
-        (detectionState.lastFaceCount && detectionState.lastFaceCount > 1);
-
-      const previousMultiFaceCount = multiFaceDetectionCount.current;
-      const currentMultiFaceCount = detectionState.multiple_face_detected_count || 0;
-      
-      if (currentMultiFaceCount > previousMultiFaceCount && multiFaceCaptureCount.current < MAX_CAPTURES) {
+      if (currentCount > prevMultiFaceCount.current && multiFaceCaptureCount.current < MAX_CAPTURES) {
+        const now = Date.now();
         const timeSinceLastCapture = now - lastMultiFaceCaptureTime.current;
-        
-        if (lastMultiFaceCaptureTime.current === 0 || timeSinceLastCapture >= MIN_CAPTURE_INTERVAL) {
+
+        if (timeSinceLastCapture >= MIN_CAPTURE_INTERVAL || lastMultiFaceCaptureTime.current === 0) {
+          captureAndUpload("multiface_detection");
           multiFaceCaptureCount.current++;
           lastMultiFaceCaptureTime.current = now;
-          multiFaceDetectionCount.current = currentMultiFaceCount;
-          captureAndUpload('multifacedetection');
         }
+        
+        prevMultiFaceCount.current = currentCount;
       }
-      
-      multiFaceDetectionCount.current = currentMultiFaceCount;
+    }, 500);
 
-      const intervals = multiFaceIntervalRef.current;
+    return () => clearInterval(interval);
+  }, [isInterviewStarted, isRecording, interviewCompleted]);
 
-      if (isMultiFaceDetected) {
-        const lastInterval = intervals[intervals.length - 1];
-        if (!lastInterval || lastInterval.endTime !== null) {
-          multiFaceIntervalRef.current.push({
-            startTime: now,
-            endTime: null
-          });
-        }
-      } else {
-        const lastInterval = intervals[intervals.length - 1];
-        if (lastInterval && lastInterval.endTime === null) {
-          lastInterval.endTime = now;
-        }
+  useEffect(() => {
+    if (!isInterviewStarted || !isRecording || interviewCompleted) return;
+
+    const currentCameraDisableCount = counts.video || 0;
+
+    if (currentCameraDisableCount > prevCameraDisableCount.current && disableCamCaptureCount.current < MAX_CAPTURES) {
+      const now = Date.now();
+      const timeSinceLastCapture = now - lastDisableCamCaptureTime.current;
+
+      if (timeSinceLastCapture >= MIN_CAPTURE_INTERVAL || lastDisableCamCaptureTime.current === 0) {
+        captureAndUpload("camera_disabled");
+        disableCamCaptureCount.current++;
+        lastDisableCamCaptureTime.current = now;
       }
-    }, 300);
+    }
 
-    return () => {
-      clearInterval(interval);
-      const lastInterval = multiFaceIntervalRef.current[multiFaceIntervalRef.current.length - 1];
-      if (lastInterval && lastInterval.endTime === null) {
-        lastInterval.endTime = Date.now();
-      }
-    };
-  }, [isInterviewStarted, isRecording, interviewCompleted, questionsStarted.current]);
+    prevCameraDisableCount.current = currentCameraDisableCount;
+  }, [counts.video, isInterviewStarted, isRecording, interviewCompleted]);
 
   useEffect(() => {
     if (!isInterviewStarted || !isRecording || interviewCompleted) return;
@@ -1630,11 +1637,9 @@ const useQuestionsHook = ({
         (detectionState.face_count !== undefined && detectionState.face_count === 0) ||
         (detectionState.faceCount !== undefined && detectionState.faceCount === 0);
 
-
       if (isUserAbsent && !currentUserAbsenceState.current) {
         userAbsenceDetectionCount.current++;
         currentUserAbsenceState.current = true;
-
         const intervals = userAbsenceIntervalRef.current;
         const lastInterval = intervals[intervals.length - 1];
         if (!lastInterval || lastInterval.endTime !== null) {
@@ -1652,37 +1657,17 @@ const useQuestionsHook = ({
           lastInterval.endTime = now;
         }
       }
-    }, 300);
+    }, 500);
 
     return () => clearInterval(interval);
-  }, [isInterviewStarted, isRecording, interviewCompleted, questionsStarted.current]);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [counts.video, isInterviewStarted, isRecording, interviewCompleted]);
-
-  useEffect(() => {
-    if (!isInterviewStarted || !isRecording || interviewCompleted) return;
-
-    if (counts.video > 0 && disableCamCaptureCount.current < MAX_CAPTURES) {
-      const now = Date.now();
-      if (disableCamCaptureCount.current === 0 || now - lastDisableCamCaptureTime.current >= MIN_CAPTURE_INTERVAL) {
-        disableCamCaptureCount.current++;
-        lastDisableCamCaptureTime.current = now;
-        captureAndUpload('disableCam');
-      }
-    }
-  }, [counts.video, isInterviewStarted, isRecording, interviewCompleted]);
+  }, [isInterviewStarted, isRecording, interviewCompleted]);
 
   const calculateMultiFaceTime = (): number => {
-    const intervals = multiFaceIntervalRef.current;
+    const intervals = detectionCounts.current.eyeTimeIntervals.multiFaces;
     const now = Date.now();
-    const totalTimeMs = intervals.reduce((total: number, interval: { endTime: number | null; startTime: number }) => {
-      const endTime = interval.endTime !== null ? interval.endTime : now;
-      const duration = endTime - interval.startTime;
+    const totalTimeMs = intervals.reduce((total: number, interval: { inTime: number | null; awayTime: number }) => {
+      const inTime = interval.inTime !== null ? interval.inTime : now;
+      const duration = inTime - interval.awayTime;
       return total + duration;
     }, 0);
 
@@ -2056,19 +2041,12 @@ const useQuestionsHook = ({
 
           const { eyeTimeIntervals } = detectionCounts.current;
 
-          let bestFileKey = null;
-          for (let i = fileKeysRef.current.length - 1; i >= 0; i--) {
-            if (fileKeysRef.current[i] && fileKeysRef.current[i].includes('absence')) {
-              bestFileKey = fileKeysRef.current[i];
-              break;
-            }
+          let lastFileKey = null;
+          if (fileKeysRef.current.length > 0) {
+            lastFileKey = fileKeysRef.current[fileKeysRef.current.length - 1];
           }
 
-          if (!bestFileKey && fileKeysRef.current.length > 0) {
-            bestFileKey = fileKeysRef.current[fileKeysRef.current.length - 1];
-          }
-
-          const screenshotPayload = bestFileKey ? { candidate_screenshots_path: bestFileKey } : {};
+          const screenshotPayload = lastFileKey ? { candidate_screenshots_path: lastFileKey } : {};
 
           const payload = {
             duration: Math.abs(Math.ceil(totalDurationInMins)),
@@ -2104,8 +2082,9 @@ const useQuestionsHook = ({
               total_eye_down_time: calculateTotalEyeTime(eyeTimeIntervals?.down || []),
               multiple_face_detected: detectionCounts.current.multiple_face_detected_count >= 1,
               multiple_face_detected_count: detectionCounts.current.multiple_face_detected_count,
-              multiple_face_detected_time: calculateTotalEyeTime(eyeTimeIntervals?.multiFaces || []),
+              multiple_face_detected_time: calculateMultiFaceTime(),
               user_absence_time: calculateUserAbsenceTime(),
+              eye_transition_count: eyeTransitionDetectionCount.current,
             },
             meeting_room_id: meetingId,
             ...screenshotPayload,
@@ -2196,9 +2175,13 @@ const useQuestionsHook = ({
       }
       stopBotAudioRecording();
 
-      const lastInterval = multiFaceIntervalRef.current[multiFaceIntervalRef.current.length - 1];
-      if (lastInterval && lastInterval.endTime === null) {
-        lastInterval.endTime = Date.now();
+      const now = Date.now();
+      const multiFaceIntervals = detectionCounts.current.eyeTimeIntervals.multiFaces;
+      if (multiFaceIntervals.length > 0) {
+        const lastInterval = multiFaceIntervals[multiFaceIntervals.length - 1];
+        if (lastInterval && lastInterval.inTime === null) {
+          lastInterval.inTime = now;
+        }
       }
     };
   }, []);
