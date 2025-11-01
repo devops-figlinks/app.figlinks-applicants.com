@@ -1232,7 +1232,8 @@ const useQuestionsHook = ({
           questions.length > 0 &&
           questionNo < questions.length &&
           !questionPlayedRef.current.has(questionNo) &&
-          !isPlayingQuestion;
+          !isPlayingQuestion &&
+          !countdownRef.current;
 
         if (shouldPlayQuestion) {
           questionPlayedRef.current.add(questionNo);
@@ -1247,7 +1248,8 @@ const useQuestionsHook = ({
         !questionPlayedRef.current.has(questionNo) &&
         questions &&
         questions.length > 0 &&
-        questionNo < questions.length
+        questionNo < questions.length &&
+        !countdownRef.current
       ) {
         questionPlayedRef.current.add(questionNo);
 
