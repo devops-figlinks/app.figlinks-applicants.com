@@ -227,7 +227,7 @@ const useQuestionsHook = ({
     }
     countdownActionRef.current = null;
     setCountdownEnded(false);
-  }, [questionNo, interviewType, questions]);
+  }, [questionNo, interviewType]);
 
   useEffect(() => {
     isRecordingRef.current = isRecording;
