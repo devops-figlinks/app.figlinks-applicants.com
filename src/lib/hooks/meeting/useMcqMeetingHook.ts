@@ -70,7 +70,7 @@ export const useMcqMeetingHook = (props: IMcqExamBlock & IQuestioningBlock) => {
   } = currentQuestion;
   useEffect(() => {
     setTimer1(true);
-    if (currentStage === "questions") {
+    if (currentStage === "questions" && !countdownRef?.current) {
       playAudioFromQuestions();
     }
     return () => {

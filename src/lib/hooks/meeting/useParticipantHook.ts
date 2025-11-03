@@ -320,8 +320,11 @@ const useParticipantHook = (
       mediaStream.addTrack(webcamStream.track);
       return mediaStream;
     }
-    setIsWebcamOnInMeeting(webcamOn);
   }, [webcamStream, webcamOn, joined]);
+
+  useEffect(() => {
+    setIsWebcamOnInMeeting(webcamOn);
+  }, [webcamOn, setIsWebcamOnInMeeting]);
 
   const onCamTrigger = async () => {
     if (cameraPermission == "granted") toggleWebcam();

@@ -56,7 +56,7 @@ const McqQuestionsComponent = (props: IMcqQuestionsBlock) => {
               {options?.map((option, index) => (
                 <Label
                   key={index}
-                  className="flex items-center gap-2 p-1.5 transition-all duration-300 ease-in-out"
+                  className="flex items-start gap-3 p-2 transition-all duration-300 ease-in-out rounded-md hover:bg-black/5"
                 >
                   <Input
                     type="radio"
@@ -64,7 +64,7 @@ const McqQuestionsComponent = (props: IMcqQuestionsBlock) => {
                     value={option}
                     checked={isOptionSelected(option)}
                     onChange={() => handleOptionSelect(option)}
-                    className="w-4 h-4 text-white focus:ring-0 accent-green-600 cursor-pointer shadow-none"
+                    className="w-4 h-4 text-white focus:ring-0 accent-green-600 cursor-pointer shadow-none mt-0.5 flex-shrink-0"
                   />
                   <span className="text-white md:text-black text-sm md:text-sm 3xl:!text-base font-medium capitalize">
                     {`${String.fromCharCode(65 + index)}. ${option}`}

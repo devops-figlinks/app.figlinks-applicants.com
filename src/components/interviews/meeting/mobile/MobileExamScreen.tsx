@@ -116,10 +116,8 @@ const MobileMcqExamScreen: FC<IMcqExamBlock & IQuestioningBlock> = (props) => {
         }
     }, [isSafari, currentStage, isInterviewStarted, handleNext]);
     
-    // Ensure timer is properly initialized for MCQ questions
     useEffect(() => {
         if (currentStage === 'questions' && interviewType === 'MCQ') {
-            // Timer is managed by useMcqMeetingHook, ensure it's properly set
         }
     }, [currentStage, interviewType, questionNo]);
 
