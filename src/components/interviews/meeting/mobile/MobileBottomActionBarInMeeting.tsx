@@ -4,7 +4,6 @@ import { motion } from "framer-motion";
 import Image from "next/image";
 import { FC, useEffect, useState } from "react";
 
-
 const MobileBottomActionBarInMeeting: FC<IMobileBottomActionBarInMeeting> = ({
   questions,
   questionNo,
@@ -29,17 +28,18 @@ const MobileBottomActionBarInMeeting: FC<IMobileBottomActionBarInMeeting> = ({
   isTimerCompleted,
   handleManualNextQuestion,
   interviewType,
-
 }) => {
-
-
   const [showTooltip, setShowTooltip] = useState(false);
   const [showTooltip2, setShowTooltip2] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
-  const isCameraAllowed = cameraPermission === "granted" || cameraPermission === "prompt";
+  const isCameraAllowed =
+    cameraPermission === "granted" || cameraPermission === "prompt";
   const isIOS = () => {
-    return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) || /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+    return (
+      /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1) ||
+      /^((?!chrome|android).)*safari/i.test(navigator.userAgent)
+    );
   };
 
   const handleCameraClick = () => {
@@ -93,13 +93,14 @@ const MobileBottomActionBarInMeeting: FC<IMobileBottomActionBarInMeeting> = ({
     return "Next";
   };
 
-
   return (
     <div className="fixed bottom-4 left-0 right-0 z-50 flex justify-center items-center pointer-events-none gap-4 shadow-none">
       <div className="flex gap-4 items-center justify-center rounded-2xl shadow-lg pointer-events-auto">
         <div className="flex items-center gap-1 bg-[#545961] rounded-2xl p-0 pr-2 h-[34px] relative">
           <div
-            className={`flex items-center justify-center ${joined === "JOINED" ? "cursor-not-allowed" : "cursor-pointer"}`}
+            className={`flex items-center justify-center ${
+              joined === "JOINED" ? "cursor-not-allowed" : "cursor-pointer"
+            }`}
             onClick={handleMicClick}
           >
             <Image
@@ -118,12 +119,24 @@ const MobileBottomActionBarInMeeting: FC<IMobileBottomActionBarInMeeting> = ({
             className="flex justify-center items-center cursor-pointer p-1"
             onClick={openMicAndSpeakerOptions}
           >
-            <Image height={15} width={15} alt="Audio Options" src="/interviews/up-arrow.svg" />
+            <Image
+              height={15}
+              width={15}
+              alt="Audio Options"
+              src="/interviews/up-arrow.svg"
+            />
           </div>
         </div>
 
-        <div className="flex justify-center items-center gap-1 bg-[#545961] rounded-2xl p-0 pr-2 h-[34px] relative" onClick={handleCameraClick}>
-          <div className={joined === "JOINED" ? "cursor-not-allowed" : "cursor-pointer"}>
+        <div
+          className="flex justify-center items-center gap-1 bg-[#545961] rounded-2xl p-0 pr-2 h-[34px] relative"
+          onClick={handleCameraClick}
+        >
+          <div
+            className={
+              joined === "JOINED" ? "cursor-not-allowed" : "cursor-pointer"
+            }
+          >
             <Image
               height={35}
               width={35}
@@ -132,18 +145,25 @@ const MobileBottomActionBarInMeeting: FC<IMobileBottomActionBarInMeeting> = ({
                 joined === "JOINED"
                   ? "/interviews/camera-on.svg"
                   : isCameraAllowed
-                    ? webcamOn
-                      ? "/interviews/camera-on.svg"
-                      : "/interviews/camera-off.svg"
+                  ? webcamOn
+                    ? "/interviews/camera-on.svg"
                     : "/interviews/camera-off.svg"
+                  : "/interviews/camera-off.svg"
               }
             />
           </div>
           <div
-            className={`flex items-center justify-center p-1 ${joined === "JOINED" ? "cursor-not-allowed" : "cursor-pointer"}`}
-            onClick={joined === "JOINED" ? () => { } : openCameraOptions}
+            className={`flex items-center justify-center p-1 ${
+              joined === "JOINED" ? "cursor-not-allowed" : "cursor-pointer"
+            }`}
+            onClick={joined === "JOINED" ? () => {} : openCameraOptions}
           >
-            <Image height={15} width={15} alt="Camera Options" src="/interviews/up-arrow.svg" />
+            <Image
+              height={15}
+              width={15}
+              alt="Camera Options"
+              src="/interviews/up-arrow.svg"
+            />
           </div>
           {showTooltip && (
             <div className="absolute bottom-full left-1/2 -translate-x-1/2 bg-[#333] text-white px-2 py-1 rounded text-xs mt-1">
@@ -152,8 +172,16 @@ const MobileBottomActionBarInMeeting: FC<IMobileBottomActionBarInMeeting> = ({
           )}
         </div>
 
-        <div className="cursor-pointer flex items-center justify-center" onClick={leaveTheMeeting}>
-          <Image height={40} width={50} alt="Leave Call" src="/interviews/CallEndIcon.svg" />
+        <div
+          className="cursor-pointer flex items-center justify-center"
+          onClick={leaveTheMeeting}
+        >
+          <Image
+            height={40}
+            width={50}
+            alt="Leave Call"
+            src="/interviews/CallEndIcon.svg"
+          />
         </div>
       </div>
 
@@ -166,9 +194,9 @@ const MobileBottomActionBarInMeeting: FC<IMobileBottomActionBarInMeeting> = ({
       >
         {isInterviewComplete && submitInterviewForTesting && submitError ? (
           <Button
-            className="bg-gradient-to-r from-[#430ca6] via-[#a533cf] to-[#ec6d78] text-white p-2 rounded-lg"
+            className="bg-gradient-to-r from-[#430ca6] via-[#a533cf] to-[#ec6d78] text-red p-2 rounded-lg"
             variant="default"
-             onClick={() => {
+            onClick={() => {
               if (submitInterviewForTesting) {
                 submitInterviewForTesting();
               }
@@ -176,7 +204,9 @@ const MobileBottomActionBarInMeeting: FC<IMobileBottomActionBarInMeeting> = ({
           >
             Submit
           </Button>
-       ) : !isInterviewComplete && (showNextButtonOrNot || (isIOS() && isTimerCompleted)) && (startTheNextQuestion || handleManualNextQuestion) ? (
+        ) : !isInterviewComplete &&
+          (showNextButtonOrNot || (isIOS() && isTimerCompleted)) &&
+          (startTheNextQuestion || handleManualNextQuestion) ? (
           <motion.div
             className="box"
             initial={{ opacity: 0, scale: 1 }}
@@ -187,10 +217,10 @@ const MobileBottomActionBarInMeeting: FC<IMobileBottomActionBarInMeeting> = ({
               ease: [0, 0.71, 0.2, 1.01],
             }}
           >
-            <div className="btnGrp">
-              <Button
-                className={`btn ${isTimerCompleted && isIOS() ? '' : ''}`}
-                variant="default"
+            <div className="">
+              <button
+                className={` ${isTimerCompleted && isIOS() ? "" : ""}`}
+                // variant="default"
                 onClick={getNextButtonHandler()}
                 title={getButtonText()}
               >
@@ -200,30 +230,32 @@ const MobileBottomActionBarInMeeting: FC<IMobileBottomActionBarInMeeting> = ({
                   width={35}
                   alt={getButtonText()}
                 />
-              </Button>
+              </button>
             </div>
           </motion.div>
         ) : (
           ""
         )}
-        {isIOS() && isIosInterview && !isInterviewComplete && !isTimerCompleted && (
-          <Button
-            className=""
-            variant="default"
-            onClick={(e) => onIOSPlayClick(audioDataRef?.current, e)}
-          >
-            <Image
-              src="/interviews/next-icon.svg"
-              height={35}
-              width={35}
-              alt="Start Interview"
-            />
-          </Button>
-        )}
+        {isIOS() &&
+          isIosInterview &&
+          !isInterviewComplete &&
+          !isTimerCompleted && (
+            <button
+              className=""
+              // variant="default"
+              onClick={(e) => onIOSPlayClick(audioDataRef?.current, e)}
+            >
+              <Image
+                src="/interviews/next-icon.svg"
+                height={35}
+                width={35}
+                alt="Start Interview"
+              />
+            </button>
+          )}
       </div>
     </div>
   );
 };
-
 
 export default MobileBottomActionBarInMeeting;

@@ -83,7 +83,6 @@ const MobileParticipantView = (
 
     isTimerCompleted,
     handleManualNextQuestion,
-
   }: IUseQuestionHookReturnType = useQuestionsHook(props);
 
   const getMinAndSecsFromSecs = (secs: number) => {
@@ -102,8 +101,8 @@ const MobileParticipantView = (
                 isInterviewComplete
                   ? [interviewData.conclude_dailog?.replaceAll("...", "")]
                   : !isInterviewStarted
-                    ? [interviewData.intro_dailog?.replaceAll("...", "")]
-                    : [`${questionNo + 1}. ${questions[questionNo]?.qtn}`]
+                  ? [interviewData.intro_dailog?.replaceAll("...", "")]
+                  : [`${questionNo + 1}. ${questions[questionNo]?.qtn}`]
               }
               speed={50}
               repeat={1}
@@ -127,16 +126,34 @@ const MobileParticipantView = (
       <div className="relative h-[50vh] bg-[#00000080]">
         {isRecording ? (
           <div className="absolute top-2 left-2 bg-white flex items-center gap-1 p-[2px_5px] rounded-[1px] z-10">
-            <Image alt="" src="/rec-dot.gif" width={15} height={15} />
+            <Image
+              src="/interviews/rec-dot.gif"
+              alt="timepicker"
+              width={15}
+              height={15}
+            />
             <p className=" text-gray-900 text-[11px] font-normal leading-none m-0">
               REC
             </p>
           </div>
-        ) : ""}
+        ) : (
+          ""
+        )}
         {remainingTime > 0 && isRecording && timer1 && (
-          <div className={`absolute top-2 right-2 flex items-center gap-1 text-xs 3xl:!text-sm font-medium leading-none capitalize m-0 bg-white p-1 w-fit rounded z-10 ${remainingTime < 10 ? 'text-[#ff6347]' : 'text-black'}`}>
-            <Image src="/interviews/timer-icon2.svg" alt="timepicker" width={14} height={14} />
-            <span style={{ fontSize: "13px", color: timerColor(remainingTime) }}>
+          <div
+            className={`absolute top-2 right-2 flex items-center gap-1 text-xs 3xl:!text-sm font-medium leading-none capitalize m-0 bg-white p-1 w-fit rounded z-10 ${
+              remainingTime < 10 ? "text-[#ff6347]" : "text-black"
+            }`}
+          >
+            <Image
+              src="/interviews/timer-icon2.svg"
+              alt="timepicker"
+              width={14}
+              height={14}
+            />
+            <span
+              style={{ fontSize: "13px", color: timerColor(remainingTime) }}
+            >
               {getMinAndSecsFromSecs(remainingTime)} secs
             </span>
           </div>
@@ -200,10 +217,7 @@ const MobileParticipantView = (
       </div>
 
       <RedirectingDialog openOrNot={isRedirecting} />
-      <Loading
-        loading={submittingInterview}
-        label="Submitting Interview..."
-      />
+      <Loading loading={submittingInterview} label="Submitting Interview..." />
     </div>
   );
 };
