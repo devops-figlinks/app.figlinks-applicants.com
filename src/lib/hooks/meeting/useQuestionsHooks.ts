@@ -143,7 +143,14 @@ const useQuestionsHook = ({
 
   const questionsStarted = useRef(false);
   const nextButtonShownRef = useRef(false);
-
+  
+const session_id = useMemo(() => {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+      return crypto.randomUUID().substring(0, 8);
+    }
+    return `s_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 5)}`;
+  }, []);
+  
   const isIOS = () => {
     return (
       /iPad|iPhone|iPod/.test(navigator.userAgent) ||
@@ -1415,6 +1422,7 @@ const useQuestionsHook = ({
         payload: {
           file_name: imageData.fileName,
           base64: imageData.base64,
+          session_id
         },
         interviewId: interview_id as string,
         candidateCode: candidate_code as string,
@@ -1430,6 +1438,7 @@ const useQuestionsHook = ({
             payload: {
               file_name: imageData.fileName,
               base64: imageData.base64,
+              session_id
             },
             interviewId: interview_id as string,
             candidateCode: candidate_code as string,
@@ -1450,6 +1459,7 @@ const useQuestionsHook = ({
             payload: {
               file_name: imageData.fileName,
               base64: imageData.base64,
+              session_id
             },
             interviewId: interview_id as string,
             candidateCode: candidate_code as string,
