@@ -15,6 +15,7 @@ import dayjs from "dayjs";
 import { getInterviewByIdAndCandidateCodeAPI } from "@/https/services/candidate";
 import { saveInterviewAPI } from "@/https/services/interviews";
 import { getTokenAPI } from "@/https/services/aiBotInterview";
+import { errPopper } from "@/helpers/popper/errPopper";
 type QuestionWithAnswer = {
   qtn: string;
   ans: string;
@@ -402,20 +403,21 @@ export default function GeminiInterviewBot() {
         interviewId: interview_id,
         candidateCode: candidate_code,
       });
-
-      if (response?.status == 200 || response?.status == 201) {
-        const questionsWithAns: QuestionWithAnswer[] =
-          response?.data?.data?.interview?.qtn_ans || [];
-        const interviewStatus = response?.data?.data?.current_interview_status;
-        if (interviewStatus === "completed") {
-          router.replace(
-            `/join-interview/${interview_id}/candidate/${candidate_code}/rating-review`
-          );
-          return;
-        }
-        const onlyQuestions = questionsWithAns.map((item) => item.qtn);
-        setStaticQuestions(onlyQuestions);
+      if (!response.success) {
+        errPopper(response);
+        return;
       }
+      const questionsWithAns: QuestionWithAnswer[] =
+        response?.data?.data?.interview?.qtn_ans || [];
+      const interviewStatus = response?.data?.data?.current_interview_status;
+      if (interviewStatus === "completed") {
+        router.replace(
+          `/join-interview/${interview_id}/candidate/${candidate_code}/rating-review`
+        );
+        return;
+      }
+      const onlyQuestions = questionsWithAns.map((item) => item.qtn);
+      setStaticQuestions(onlyQuestions);
     } catch (err: any) {
       console.error("Interview load failed:", err);
     }
@@ -473,16 +475,17 @@ export default function GeminiInterviewBot() {
         interviewId: interview_id as string,
         candidateCode: candidate_code as string,
       });
-      if (response.status == 200 || response.status == 201) {
-        successPopper(response?.data?.message);
-        router.push(
-          `/join-interview/${interview_id}/candidate/${candidate_code}/rating-review`
-        );
-      } else {
+      if (!response.success) {
         throw response;
       }
+
+      successPopper(response.data?.message);
+
+      router.push(
+        `/join-interview/${interview_id}/candidate/${candidate_code}/rating-review`
+      );
     } catch (err) {
-    } finally {
+      errPopper(err);
     }
   };
 
@@ -606,21 +609,6 @@ export default function GeminiInterviewBot() {
           - Thank them professionally.
           - End with: 'Have a great day'.
            - Then stop the interview.`,
-
-        // "You are a professional HR interviewer conducting a job interview. Your role is to:\n" +
-        // "- Ask thoughtful, relevant interview questions one at a time. Every question must end with question mark ?\n" +
-        // "- Listen carefully to candidate responses\n" +
-        // "- Ask follow-up questions based on their answers\n" +
-        // "- Maintain a professional yet friendly tone\n" +
-        // "- Keep your questions concise and clear\n" +
-        // "- Cover topics like: work experience, skills, problem-solving abilities, and cultural fit\n" +
-        // "- IMPORTANT: You are the INTERVIEWER. You ask questions, you don't answer them. The candidate will respond to your questions.\n" +
-        // "- Start by greeting the candidate and asking them to introduce themselves.\n" +
-        // "- You will ask exactly 5 questions total during this interview.\n" +
-        // "- After the 5th question is answered, thank the candidate and conclude the interview professionally." +
-        // "- End the interview with have a great day" +
-        // "- Always speak only in English (en-US). Do not use any other language under any circumstance. Even if the user speaks another language, always reply only in English." +
-        // " If you receive a message indicating the user is silent or did not answer, you must politely ask the next interview question immediately.",
 
         speechConfig: {
           voiceConfig: {
