@@ -276,3 +276,12 @@ export const interviewUserImagesAPI = async ({
     throw err;
   }
 };
+
+export const getTokenAPI = async () => {
+  try{
+    const response = await $fetch.get("/bot/get-ephemeral-token");
+    return response;
+  }catch(err){
+    throw err;
+  }
+}
