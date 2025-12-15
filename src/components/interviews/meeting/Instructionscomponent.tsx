@@ -165,6 +165,12 @@ const Instructionscomponent = () => {
     getInterviewById();
   }, []);
   const handleProceedClick = () => {
+    if (interviewType === "SURVEY") {
+      router.push(
+        `/join-interview/${interview_id}/candidate/${candidate_code}/bot-interview`
+      );
+      return;
+    }
     const isMobile = pathname.includes("instructions-mobile");
     if (isMobile) {
       router.push(
@@ -296,7 +302,7 @@ const Instructionscomponent = () => {
                     <Checkbox
                       className="hover:bg-transparent text-white dark:data-[state=checked]:bg-[#a533cf] data-[state=checked]:bg-[#A533CF] data-[state=checked]:border-[#A533CF] border-[#2f80ed] [&>span>svg]:size-4.5"
                       checked={checked}
-                      onCheckedChange={(checked) =>{
+                      onCheckedChange={(checked) => {
                         setChecked(
                           checked === "indeterminate" ? false : checked
                         );
@@ -315,7 +321,7 @@ const Instructionscomponent = () => {
                           return false;
                         }
                       }}
-                      tabIndex={-1} 
+                      tabIndex={-1}
                     />
                     <p className="text-[#2f80ed] text-[13px] md:text-base 3xl:!text-lg font-normal leading-[150%]">
                       I have read and agree to the above instructions.
@@ -331,7 +337,7 @@ const Instructionscomponent = () => {
                       onClick={checked ? handleProceedClick : undefined}
                       disabled={!checked}
                     >
-                      Proceed 
+                      Proceed
                     </Button>
                   </div>
                 </div>

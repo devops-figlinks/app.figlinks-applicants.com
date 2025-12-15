@@ -13,7 +13,6 @@ import PrecallScreen from "./PrecallScreen";
 import QuestioningBlock from "./QuestioningBlock";
 import ExamScreen from "./McqMeetingView";
 import McqExamScreen from "./McqMeetingView";
-import GeminiInterviewBot from "./GeminiInterviewWithVideoSDK";
 
 const MeetingView: FC<IMeetingViewWebAndMobile> = ({
   onMeetingLeave,
@@ -217,14 +216,6 @@ const MeetingView: FC<IMeetingViewWebAndMobile> = ({
                     isSafari={isSafari}
                   />
                 ))
-              ) : interviewType === "SURVEY" ? (
-                <GeminiInterviewBot
-                  // interviewData={interviewData}
-                  // setIsInterviewCompleted={setIsInterviewCompleted}
-                  // setEndCall={setEndCall}
-                  // meetingId={meetingId}
-                  // participantName={participantName as string}
-                />
               ) : (
                 <div className="grid grid-cols-[63%_35.5%] gap-4 items-start p-3">
                   <div className="rounded-xl relative h-[80vh] bg-[#000]">
