@@ -111,7 +111,8 @@ const MeetingView: FC<IMeetingViewWebAndMobile> = ({
     setInterviewTimes,
     currentStage,
     setCurrentStage,
-    videoStreamOff, setVideoStreamOff,
+    videoStreamOff,
+    setVideoStreamOff,
     isSafari,
   }: IUseMeetingHookReturnType = useMeetingHook({
     onMeetingLeave,
@@ -123,7 +124,6 @@ const MeetingView: FC<IMeetingViewWebAndMobile> = ({
     setQuestions,
     videoSDKToken,
     webHookObj,
-
   });
 
   return (
@@ -141,7 +141,7 @@ const MeetingView: FC<IMeetingViewWebAndMobile> = ({
         >
           <div className="bg-[url('/interview@3x.png')] bg-cover bg-no-repeat bg-top min-h-[100vh] box-border pt-8 pb-6">
             <div className="rounded-xl bg-white shadow-[0_0_9px_rgba(0,0,0,0.14)] p-4 w-[95%] mx-auto">
-              {interviewType === 'MCQ' ? (
+              {interviewType === "MCQ" ? (
                 [...participants.keys()].map((participantId) => (
                   <McqExamScreen
                     key={participantId}
@@ -328,9 +328,9 @@ const MeetingView: FC<IMeetingViewWebAndMobile> = ({
                   </div>
                 </div>
               )}
-            </div >
-          </div >
-        </motion.div >
+            </div>
+          </div>
+        </motion.div>
       ) : (
         <PrecallScreen
           micOnOrNot={micOnOrNot}
