@@ -14,8 +14,16 @@ import CandidateForm from "./CandidateForm";
 import CandidateOTPForm from "./CandidateOTPForm";
 import { useInterviewContext } from "@/context/InterviewContext";
 import { set } from "date-fns";
-import { getInterviewDetailsByIdForCandidateAPI, getWorkflowInterviewDetailsByIdForCandidateAPI } from "@/https/services/interviews";
-import { getCandidateByEmailAPI, onCreateCandidateAPI, onVerifyCandidateOTPAPI, resendOTPAPI } from "@/https/services/candidate";
+import {
+  getInterviewDetailsByIdForCandidateAPI,
+  getWorkflowInterviewDetailsByIdForCandidateAPI,
+} from "@/https/services/interviews";
+import {
+  getCandidateByEmailAPI,
+  onCreateCandidateAPI,
+  onVerifyCandidateOTPAPI,
+  resendOTPAPI,
+} from "@/https/services/candidate";
 
 const NewCandidate = () => {
   const { workflow_id, interview_id } = useParams();
@@ -168,7 +176,6 @@ const NewCandidate = () => {
         takeCandidateToInterview(response?.data);
       } else if (response.status == 422) {
         setErrors(response?.data?.errors);
-        setOtp("");
       } else {
         setOtp("");
         throw response;
@@ -192,6 +199,8 @@ const NewCandidate = () => {
   const onResendOTP = async () => {
     if (otpLoading) return;
     if (resendOTPLoading) return;
+    setOtp("");
+    setErrors([]);
     setOtpSuccessMessageOrNot(false);
     setResendOTPLoading(true);
     await resendOTP({ id: candidateId });
