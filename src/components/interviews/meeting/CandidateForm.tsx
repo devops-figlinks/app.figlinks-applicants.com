@@ -8,7 +8,12 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { LoaderCircle } from "lucide-react";
-import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+} from "@/components/ui/card";
 
 const CandidateForm: FC<ICandidateForm> = ({
   loading,
@@ -27,7 +32,9 @@ const CandidateForm: FC<ICandidateForm> = ({
     if (name === "fname" || name === "lname") {
       let cleanValue = value.replace(/[^a-zA-Z\s]/g, "");
       cleanValue = cleanValue.replace(/^\s+/, "").replace(/\s{2,}/g, " ");
-      formattedValue = cleanValue.replace(/\b\w/g, (char: string) => char.toUpperCase());
+      formattedValue = cleanValue.replace(/\b\w/g, (char: string) =>
+        char.toUpperCase()
+      );
     } else if (name === "phone") {
       formattedValue = value.replace(/\D/g, "").slice(0, 10);
     }
@@ -51,7 +58,8 @@ const CandidateForm: FC<ICandidateForm> = ({
                 Register to take interview
               </p>
               <p className="text-xs 3xl:!text-sm font-medium text-[#000000cc] capitalize leading-tight">
-                Please fill in your details to get started with the interview process.
+                Please fill in your details to get started with the interview
+                process.
               </p>
             </CardHeader>
             <div className="flex items-start justify-between gap-4 max-[767px]:hidden">
@@ -64,7 +72,10 @@ const CandidateForm: FC<ICandidateForm> = ({
                 {interviewData?.company_logo ? (
                   <Image
                     alt=""
-                    src={interviewData?.company_logo || "/interviews/fig-links-logo.svg"}
+                    src={
+                      interviewData?.company_logo ||
+                      "/interviews/fig-links-logo.svg"
+                    }
                     width={80}
                     height={80}
                     className="object-contain"
@@ -164,7 +175,7 @@ const CandidateForm: FC<ICandidateForm> = ({
                   </div>
                   <div className="flex flex-col gap-1">
                     <Label className="text-xs 3xl:!text-sm font-medium text-[#383838] capitalize">
-                      Mobile No.
+                      Mobile No<span className="text-red-500">*</span>
                     </Label>
                     <Input
                       className="w-full bg-[#bb44e80f] text-sm 3xl:!text-base font-normal rounded-md max-[767px]:h-8 shadow-none border border-[#e7ddea] h-10 focus-visible:ring-0"
@@ -175,6 +186,7 @@ const CandidateForm: FC<ICandidateForm> = ({
                       value={candidateDetails?.phone ?? ""}
                       onChange={onTextFieldChange}
                     />
+                    <ErrorMessages errorMessages={errors} keyname="phone" />
                   </div>
                 </div>
                 <div className="flex justify-end mt-10">
