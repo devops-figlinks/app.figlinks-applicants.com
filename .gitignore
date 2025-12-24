@@ -30,7 +30,8 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 FlowChart.mermaid
-
+Flow.mermaid
+Chart.mermaid
 # env files (can opt-in for committing if needed)
 .env*
 
