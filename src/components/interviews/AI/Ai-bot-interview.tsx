@@ -313,16 +313,16 @@ export default function GeminiInterviewBot() {
       interviewEndTimeRef.current = dayjs().toISOString();
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
 
-      const finalBlob = new Blob(chunksRef.current, {
-        type: "audio/webm;codecs=opus",
-      });
+      // const finalBlob = new Blob(chunksRef.current, {
+      //   type: "audio/webm;codecs=opus",
+      // });
 
-      const url = URL.createObjectURL(finalBlob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `interview_${Date.now()}.webm`;
-      a.click();
-      URL.revokeObjectURL(url);
+      // const url = URL.createObjectURL(finalBlob);
+      // const a = document.createElement("a");
+      // a.href = url;
+      // a.download = `interview_${Date.now()}.webm`;
+      // a.click();
+      // URL.revokeObjectURL(url);
       await new Promise((r) => setTimeout(r, 200));
       await startSubmittingInterview();
       setIsRecording(false);
@@ -493,11 +493,11 @@ export default function GeminiInterviewBot() {
     const userFragment = message?.serverContent?.inputTranscription?.text;
 
     const botFragment = message?.serverContent?.outputTranscription?.text;
+    const turnCompleted = message?.serverContent?.turnComplete;
     if (userFragment && !botSpeakingRef.current) {
       userTranscriptionBufferRef.current += userFragment + " ";
-      console.log("User merged:", userTranscriptionBufferRef.current.trim());
+      // console.log("User merged:", userTranscriptionBufferRef.current.trim());
     }
-    let mergedBot = "";
     if (botFragment) {
       if (
         !botSpeakingRef.current &&
@@ -520,24 +520,32 @@ export default function GeminiInterviewBot() {
 
       botSpeakingRef.current = true;
       transcriptionBufferRef.current += botFragment + " ";
-      mergedBot = transcriptionBufferRef.current.trim();
+
+      const mergedBot = transcriptionBufferRef.current.trim();
+
       setDisplayedQuestion(mergedBot);
-      if (/[?]$/.test(mergedBot)) {
+      // console.log("Bot merged:", mergedBot);
+    }
+    if (turnCompleted) {
+      const finalBotQuestion = transcriptionBufferRef.current.trim();
+
+      if (finalBotQuestion) {
+        // console.log("Bot turn complete with question:", finalBotQuestion);
         setQaArray((prev) => {
-          const updated = [...prev, { qtn: mergedBot, c_ans: "" }];
-          console.log("Q&A Array:", updated);
+          const updated = [...prev, { qtn: finalBotQuestion, c_ans: "" }];
+          // console.log("Q&A Array:", updated);
           qaArrayRef.current = updated;
           return updated;
         });
-        transcriptionBufferRef.current = "";
-        botSpeakingRef.current = false;
       }
+      transcriptionBufferRef.current = "";
+      botSpeakingRef.current = false;
     }
     if (message.data) {
       audioQueueRef.current.push(message.data);
       playAudioQueue();
     }
-    const cleaned = mergedBot
+    const cleaned = transcriptionBufferRef.current
       .replace(/\s+/g, " ")
       .replace(/[^\w\s!?.]/g, "")
       .toLowerCase();

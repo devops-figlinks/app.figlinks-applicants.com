@@ -5,7 +5,13 @@ export const checkForInterviewValidations = (
   setLoadingText: Dispatch<SetStateAction<string>>,
   redirectOrNot?: boolean
 ) => {
-  const { interview_code, c_rating, completed, interview_id } = interview;
+    const interview_id =
+    interview?.interview_id ??
+    interview?.interview?.id ??
+    interview?.workflow_interview_ids?.[0];
+
+  const { interview_code, c_rating, completed } = interview;
+
   if (!completed) {
     if (redirectOrNot) {
       return true;
