@@ -756,6 +756,20 @@ const useQuestionsHook = ({
             err
           );
         }
+        const audioEnded = new Promise<void>((resolve) => {
+          const onEnded = () => {
+            audio.removeEventListener("ended", onEnded);
+            resolve();
+          };
+          audio.addEventListener("ended", onEnded);
+          setTimeout(() => {
+            if (audio.currentTime < (duration || 5) - 0.5) {
+              console.warn("Non-iOS audio ended fallback");
+              resolve();
+            }
+          }, (duration || 5) * 1000 + 500);
+        });
+        await audioEnded;
         const questionStartTime = dayjs().toISOString();
         if (questionNo !== questions.length) {
           showNextButton();
@@ -1696,16 +1710,35 @@ const useQuestionsHook = ({
         setBotSpeechRendered(true);
       }
       await audio.play();
-      setTimeout(() => {
-        if (
-          !isSubmittingRef.current &&
-          !interviewCompleted &&
-          !submittingInterview
-        ) {
-          startSubmittingInterview();
-        }
-      }, 500);
+      const audioEndedPromise: Promise<void> = new Promise((resolve) => {
+        const onEnded = () => {
+          audio.removeEventListener("ended", onEnded);
+          resolve();
+        };
+        audio.addEventListener("ended", onEnded);
+      });
+      const timeoutPromise: Promise<void> = new Promise((resolve) => {
+        setTimeout(() => {
+          console.warn("Conclude audio fallback timeout triggered");
+          resolve();
+        }, (concludeAudioTime as number) * 1000 + 1000);
+      });
+      await Promise.race([audioEndedPromise, timeoutPromise]);
+      if (isRecording) {
+        stopRecording();
+      }
+      if (
+        !isSubmittingRef.current &&
+        !interviewCompleted &&
+        !submittingInterview
+      ) {
+        startSubmittingInterview();
+      }
     } catch (error) {
+      console.error("Conclude audio error:", error);
+      if (isRecording) {
+        stopRecording();
+      }
       if (
         !isSubmittingRef.current &&
         !interviewCompleted &&

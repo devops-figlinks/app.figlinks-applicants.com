@@ -122,6 +122,7 @@ const Instructionscomponent = () => {
   const pathname = usePathname();
   const { interview_id, candidate_code } = useParams();
   const [checked, setChecked] = useState(false);
+  const [isNavigating, setIsNavigating] = useState(false);
   const [loadingLabel, setLoadingLabel] = useState(
     "Getting Interview Details..."
   );
@@ -161,27 +162,28 @@ const Instructionscomponent = () => {
     } finally {
     }
   };
-  useEffect(() => {
-    getInterviewById();
-  }, []);
-  const handleProceedClick = () => {
+  const handleProceedClick = async () => {
+    setIsNavigating(true);
     if (interviewType === "SURVEY") {
-      router.push(
+      await router.push(
         `/join-interview/${interview_id}/candidate/${candidate_code}/bot-interview`
       );
       return;
     }
     const isMobile = pathname.includes("instructions-mobile");
     if (isMobile) {
-      router.push(
+      await router.push(
         `/join-interview/${interview_id}/candidate/${candidate_code}/source-device-mobile`
       );
     } else {
-      router.push(
+      await router.push(
         `/join-interview/${interview_id}/candidate/${candidate_code}/source-device-desktop`
       );
     }
   };
+  useEffect(() => {
+    getInterviewById();
+  }, []);
 
   if (userNotFound) {
     return (
@@ -329,15 +331,26 @@ const Instructionscomponent = () => {
                   </div>
                   <div className="p-2">
                     <Button
-                      className={`w-full md:w-fit mt-4 md:mt-8 mb-4 px-6 py-1.5 rounded-md text-white capitalize cursor-pointer ${
+                      className={`w-full md:w-fit mt-4 md:mt-8 mb-4 px-6 py-1.5 rounded-md text-white capitalize cursor-pointer flex items-center justify-center gap-2 ${
                         checked
                           ? "bg-gradient-to-r from-[#430CA6] via-[#A533CF] to-[#EC6D78]"
                           : "bg-gray-300 cursor-not-allowed"
                       }`}
-                      onClick={checked ? handleProceedClick : undefined}
-                      disabled={!checked}
+                      onClick={
+                        checked && !isNavigating
+                          ? handleProceedClick
+                          : undefined
+                      }
+                      disabled={!checked || isNavigating}
                     >
-                      Proceed
+                      {isNavigating ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          Proceeding
+                        </>
+                      ) : (
+                        "Proceed"
+                      )}
                     </Button>
                   </div>
                 </div>
