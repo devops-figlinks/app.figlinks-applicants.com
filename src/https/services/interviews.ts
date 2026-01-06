@@ -37,7 +37,6 @@ export const saveInterviewAPI = async ({
   candidateCode: string;
 }) => {
   try {
-    // `/interviews/${interviewId}/candidates/${candidateCode}/submit`,
     return await $fetch.post(
       `/interviews/${interviewId}/candidates/${candidateCode}/submit`,
       payload
