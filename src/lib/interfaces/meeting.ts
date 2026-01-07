@@ -519,9 +519,9 @@ export interface IUseQuestionHookReturnType {
   onIOSPlayClick: OnIOSPlayClickType;
   isTimerCompleted: boolean;
   handleManualNextQuestion: () => void;
-  botMediaRecorder: MediaRecorder | null;
-  botAudioChunks: Blob[];
-  isInDelayPeriod:any;
+  botMediaRecorder?: MediaRecorder | null;
+  botAudioChunks?: Blob[];
+  isInDelayPeriod?:any;
 }
 
 export interface IQuestioningBlock {
