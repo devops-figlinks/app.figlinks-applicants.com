@@ -1217,7 +1217,9 @@ const session_id = useMemo(() => {
   const playConclude = async (): Promise<void> => {
     setShowNextButtonOrNot(false);
     setIsInterviewCompleted(true);
-
+    if (isRecording) {
+        stopRecording();
+      }
     setRenderTypeWriter(false);
 
     const audio = new Audio();
@@ -1262,6 +1264,9 @@ const session_id = useMemo(() => {
 
   useEffect(() => {
     if (isInterviewStarted && questions.length && questionNo >= questions.length) {
+      if (isRecording) {
+        stopRecording();
+      }
       setQuestions([]);
       playConclude();
     }
@@ -1437,13 +1442,7 @@ const session_id = useMemo(() => {
 
           if (response.status == 200 || response.status == 201) {
             setInterviewCompleted(true);
-
-            if (isRecording) {
-              stopRecording();
-            }
-            
             fileKeysRef.current = [];
-            
             successPopper(response?.data?.message);
 
             await clearStorage();
