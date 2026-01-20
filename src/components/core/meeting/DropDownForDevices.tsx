@@ -22,6 +22,7 @@ export const DropDownForDevices = ({
   testSpeakers,
   id,
 }: IDropDownForDevices) => {
+  console.log("mediaDevicesList", mediaDevicesList);
   return (
     <Select
       value={selectedDevice}

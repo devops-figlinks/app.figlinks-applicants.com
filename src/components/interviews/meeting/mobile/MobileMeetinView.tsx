@@ -1,7 +1,7 @@
 import Loading from "@/components/core/Loading";
+import { DropDownForDevices } from "@/components/core/meeting/DropDownForDevices";
 import StreamVideoPlayer from "@/components/core/meeting/StreamVideoPlayer";
 import { stringAvatar } from "@/helpers/muiAvatar";
-import { changeFirstCharToUpper } from "@/lib/helpers/changeFirstCharToUpper";
 import { useDisableZoom } from "@/lib/hooks/disableZoomHook";
 import useMeetingHook from "@/lib/hooks/meeting/useMeetingHook";
 import {
@@ -10,15 +10,12 @@ import {
 } from "@/lib/interfaces/meeting";
 import { motion } from "framer-motion";
 import Image from "next/image";
-import { FC, SetStateAction, useEffect, useState } from "react";
+import { FC, useEffect, useState } from "react";
 import MobileParticipantView from "./MobileParticipantView";
-import { getColorByFirstLetter } from "@/helpers/generateCharColors";
-import MobileExamScreen from "./MobileExamScreen";
 import MobileMcqExamScreen from "./MobileExamScreen";
 import { Avatar } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { DropDownForDevices } from "@/components/core/meeting/DropDownForDevices";
+import { DeviceInfo } from "@videosdk.live/react-sdk";
 
 const MobileMeetingView: FC<IMeetingViewWebAndMobile> = ({
   participantName,
@@ -129,8 +126,10 @@ const MobileMeetingView: FC<IMeetingViewWebAndMobile> = ({
     videoSDKToken,
     webHookObj,
   });
-  const isMicrophoneAllowed = microphonePermission === "granted" || microphonePermission === "prompt";
-  const isCameraAllowed = cameraPermission === "granted" || cameraPermission === "prompt";
+  const isMicrophoneAllowed =
+    microphonePermission === "granted" || microphonePermission === "prompt";
+  const isCameraAllowed =
+    cameraPermission === "granted" || cameraPermission === "prompt";
 
   const [openQuestions, setOpenQuestions] = useState(false);
   useEffect(() => {
@@ -143,6 +142,59 @@ const MobileMeetingView: FC<IMeetingViewWebAndMobile> = ({
     }
   }, [joined]);
 
+  useEffect(() => {
+    if (interviewType !== "MCQ" && audioDevicesList.length > 0) {
+      type DeviceWithPriority = { device: DeviceInfo; priority: number };
+      const preferredDevices: DeviceWithPriority[] = [];
+      audioDevicesList.forEach((device) => {
+        const lowerLabel = device.label.toLowerCase();
+        const isAudioInput = device.kind === "audioinput";
+
+        if (!isAudioInput) return;
+        const isWiredHeadset = lowerLabel.includes("wired headset");
+        const isBluetoothDevice =
+          lowerLabel.includes("bluetooth") ||
+          (lowerLabel.includes("headset") &&
+            !lowerLabel.includes("earpiece") &&
+            !lowerLabel.includes("wired"));
+        const isSpeakerphone = lowerLabel.includes("speakerphone");
+
+        if (isWiredHeadset) {
+          preferredDevices.push({ device, priority: 1 });
+        } else if (isBluetoothDevice) {
+          preferredDevices.push({ device, priority: 2 });
+        } else if (isSpeakerphone) {
+          preferredDevices.push({ device, priority: 3 });
+        }
+      });
+      preferredDevices.sort((a, b) => a.priority - b.priority);
+
+      let deviceToSelect: DeviceInfo | undefined;
+
+      if (preferredDevices.length > 0) {
+        deviceToSelect = preferredDevices[0].device;
+      } else {
+        deviceToSelect =
+          audioDevicesList.find((device) =>
+            device.label.toLowerCase().includes("speakerphone"),
+          ) || audioDevicesList[0];
+      }
+
+      const currentSelectedDevice = audioDevicesList.find(
+        (device) => device.deviceId === selectedMic,
+      );
+
+      if (
+        !currentSelectedDevice ||
+        currentSelectedDevice.deviceId !== deviceToSelect.deviceId
+      ) {
+        handleMicChange(deviceToSelect.deviceId);
+      } else {
+        
+      }
+    } else {
+    }
+  }, [audioDevicesList, selectedMic, handleMicChange, interviewType]);
   const getDisabledReason = () => {
     if (interviewType === "MCQ") {
       if (!camOnOrNot) {
@@ -320,7 +372,7 @@ const MobileMeetingView: FC<IMeetingViewWebAndMobile> = ({
                 setVideoStreamOff={setVideoStreamOff}
                 isSafari={isSafari}
               />
-            )
+            ),
           )}
         </motion.div>
       ) : (
@@ -358,7 +410,6 @@ const MobileMeetingView: FC<IMeetingViewWebAndMobile> = ({
                   videoDevicesList={videoDevicesList}
                   height={"100%"}
                   width={"100%"}
-
                 />
               ) : (
                 <div className="w-[100px] h-[100px] flex justify-center items-center">
@@ -376,9 +427,10 @@ const MobileMeetingView: FC<IMeetingViewWebAndMobile> = ({
                           width={30}
                           alt=""
                           src={
-                            isMicrophoneAllowed ? audioStream
-                              ? "/interviews/mic-on.svg"
-                              : "/interviews/mic-off.svg"
+                            isMicrophoneAllowed
+                              ? audioStream
+                                ? "/interviews/mic-on.svg"
+                                : "/interviews/mic-off.svg"
                               : "/interviews/mic-off.svg"
                           }
                         />
@@ -456,10 +508,11 @@ const MobileMeetingView: FC<IMeetingViewWebAndMobile> = ({
             <div className="flex items-center justify-center w-full">
               <Button
                 disabled={!!getDisabledReason()}
-                className={`rounded-sm text-white text-sm font-normal capitalize px-8 py-2 cursor-pointer w-full ${getDisabledReason()
-                  ? "bg-[#d0cece] cursor-not-allowed"
-                  : "bg-gradient-to-r from-[#430ca6] via-[#a533cf] to-[#ec6d78]"
-                  }`}
+                className={`rounded-sm text-white text-sm font-normal capitalize px-8 py-2 cursor-pointer w-full ${
+                  getDisabledReason()
+                    ? "bg-[#d0cece] cursor-not-allowed"
+                    : "bg-gradient-to-r from-[#430ca6] via-[#a533cf] to-[#ec6d78]"
+                }`}
                 variant="default"
                 onClick={joinMeeting}
               >
