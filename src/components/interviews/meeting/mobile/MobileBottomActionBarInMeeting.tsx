@@ -196,7 +196,6 @@ const shouldShowNextButton = !isInterviewComplete &&
         className="sticky bottom-0 right-0 flex gap-4 items-center justify-center rounded-2xl shadow-lg pointer-events-auto"
         style={{
           right: "2em",
-          bottom: "1.6em",
         }}
       >
         {isInterviewComplete && submitInterviewForTesting && submitError ? (
