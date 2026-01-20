@@ -35,11 +35,9 @@ const MobileBottomActionBarInMeeting: FC<IMobileBottomActionBarInMeeting> = ({
   const isCameraAllowed =
     cameraPermission === "granted" || cameraPermission === "prompt";
   const isIOS = () => {
-    return (
-      /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1) ||
-      /^((?!chrome|android).)*safari/i.test(navigator.userAgent)
-    );
+    const userAgent = navigator.userAgent.toLowerCase();
+    return /iphone|ipad|ipod/.test(userAgent) || 
+           (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
   };
 
   const handleCameraClick = () => {
@@ -75,6 +73,10 @@ const MobileBottomActionBarInMeeting: FC<IMobileBottomActionBarInMeeting> = ({
   }, [submitError, submitInterviewForTesting, retryCount]);
 
   const isLastQuestion = questionNo === questions.length - 1;
+const shouldShowNextButton = !isInterviewComplete && 
+    (showNextButtonOrNot || (isIOS() && isTimerCompleted)) && 
+    (startTheNextQuestion || handleManualNextQuestion);
+
   const getNextButtonHandler = () => {
     if (isIOS() && interviewType !== "MCQ" && isTimerCompleted) {
       return handleManualNextQuestion;
@@ -91,6 +93,12 @@ const MobileBottomActionBarInMeeting: FC<IMobileBottomActionBarInMeeting> = ({
     }
     return "Next";
   };
+
+  const shouldShowPlayButton = isIOS() &&
+    isIosInterview &&
+    !isInterviewComplete &&
+    !isTimerCompleted &&
+    !shouldShowNextButton;
 
   return (
     <div className="fixed bottom-4 left-0 right-0 z-50 flex justify-center items-center pointer-events-none gap-4 shadow-none">
@@ -203,9 +211,7 @@ const MobileBottomActionBarInMeeting: FC<IMobileBottomActionBarInMeeting> = ({
           >
             Submit
           </Button>
-        ) : !isInterviewComplete &&
-          (showNextButtonOrNot || (isIOS() && isTimerCompleted)) &&
-          (startTheNextQuestion || handleManualNextQuestion) ? (
+        ) : shouldShowNextButton ? (
           <motion.div
             className="box"
             initial={{ opacity: 0, scale: 1 }}
@@ -218,8 +224,6 @@ const MobileBottomActionBarInMeeting: FC<IMobileBottomActionBarInMeeting> = ({
           >
             <div className="">
               <button
-                className={` ${isTimerCompleted && isIOS() ? "" : ""}`}
-                // variant="default"
                 onClick={getNextButtonHandler()}
                 title={getButtonText()}
               >
@@ -232,26 +236,18 @@ const MobileBottomActionBarInMeeting: FC<IMobileBottomActionBarInMeeting> = ({
               </button>
             </div>
           </motion.div>
-        ) : (
-          ""
-        )}
-        {isIOS() &&
-          isIosInterview &&
-          !isInterviewComplete &&
-          !isTimerCompleted && (
-            <button
-              className=""
-              // variant="default"
-              onClick={(e) => onIOSPlayClick(audioDataRef?.current, e)}
-            >
-              <Image
-                src="/interviews/next-icon.svg"
-                height={35}
-                width={35}
-                alt="Start Interview"
-              />
-            </button>
-          )}
+        ) : shouldShowPlayButton ? (
+          <button
+            onClick={(e) => onIOSPlayClick(audioDataRef?.current, e)}
+          >
+            <Image
+              src="/interviews/next-icon.svg"
+              height={35}
+              width={35}
+              alt="Start Interview"
+            />
+          </button>
+        ) : null}
       </div>
     </div>
   );
