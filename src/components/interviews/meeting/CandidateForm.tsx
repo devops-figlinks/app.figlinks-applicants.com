@@ -33,7 +33,7 @@ const CandidateForm: FC<ICandidateForm> = ({
       let cleanValue = value.replace(/[^a-zA-Z\s]/g, "");
       cleanValue = cleanValue.replace(/^\s+/, "").replace(/\s{2,}/g, " ");
       formattedValue = cleanValue.replace(/\b\w/g, (char: string) =>
-        char.toUpperCase()
+        char.toUpperCase(),
       );
     } else if (name === "phone") {
       formattedValue = value.replace(/\D/g, "").slice(0, 10);
@@ -180,11 +180,22 @@ const CandidateForm: FC<ICandidateForm> = ({
                     <Input
                       className="w-full bg-[#bb44e80f] text-sm 3xl:!text-base font-normal rounded-md max-[767px]:h-8 shadow-none border border-[#e7ddea] h-10 focus-visible:ring-0"
                       placeholder="Enter Mobile No."
-                      type="number"
+                      type="tel"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
                       name="phone"
-                      onWheel={(e) => (e.target as HTMLInputElement).blur()}
                       value={candidateDetails?.phone ?? ""}
                       onChange={onTextFieldChange}
+                      onKeyDown={(e) => {
+                        if (
+                          e.key === "-" ||
+                          e.key === "." ||
+                          e.key === "e" ||
+                          e.key === "E"
+                        ) {
+                          e.preventDefault();
+                        }
+                      }}
                     />
                     <ErrorMessages errorMessages={errors} keyname="phone" />
                   </div>
