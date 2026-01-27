@@ -71,6 +71,7 @@ const useQuestionsHook = ({
   const [showNextButtonOrNot, setShowNextButtonOrNot] = useState(false);
   const [submittingInterview, setSubmittingInterview] = useState(false);
   const [isDurationCompleted, setIsDurationCompleted] = useState(false);
+  const [interviewStartTime, setInterviewStartTime] = useState<string | null>(null);
   const { stopRecording, localParticipant } = useMeeting();
   const [timer1, setTimer1] = useState(false);
   const [remainingTime, setRemainingTime] = useState(0);
@@ -104,7 +105,7 @@ const useQuestionsHook = ({
   const MIN_CAPTURE_INTERVAL = 1000;
   
   const fileKeysRef = useRef<string[]>([]);
-const session_id = useMemo(() => {
+  const session_id = useMemo(() => {
     if (typeof crypto !== 'undefined' && crypto.randomUUID) {
       return crypto.randomUUID().substring(0, 8);
     }
@@ -484,6 +485,12 @@ const session_id = useMemo(() => {
     }
   }, [counts.video, isInterviewStarted, isRecording, interviewCompleted]);
 
+  useEffect(() => {
+    if (isInterviewStarted && isRecording && !interviewStartTime) {
+      setInterviewStartTime(dayjs().toISOString());
+    }
+  }, [isInterviewStarted, isRecording, interviewStartTime]);
+
   const playIntro = async () => {
     if (introPlayedRef.current) return;
 
@@ -602,6 +609,16 @@ const session_id = useMemo(() => {
     }
   };
 
+  const calculateTotalDurationInSeconds = (endTime: string): number => {
+    const interviewEndTime = new Date(endTime).getTime();
+    const startTime = interviewStartTime 
+      ? new Date(interviewStartTime).getTime() 
+      : interviewEndTime;
+    const durationMs = Math.abs(interviewEndTime - startTime);
+    const durationSeconds = Math.ceil(durationMs / 1000);
+    return Math.max(1, durationSeconds);
+  };
+
   const startSubmittingInterview = async ({ lastQuestionEndTime }: { lastQuestionEndTime: string }) => {
     try {
       isSubmittingRef.current = true;
@@ -666,8 +683,7 @@ const session_id = useMemo(() => {
               difficulty: qtn.difficulty,
             }));
 
-      const totalDurationInMins =
-        (new Date(lastQuesEndTime).getTime() - new Date(firstQuesStartTime).getTime()) / 1000 / 60;
+      const totalDurationInSeconds = calculateTotalDurationInSeconds(lastQuestionTime);
 
       const calculateTotalTime = (intervals: any[]) => {
         return (
@@ -711,7 +727,7 @@ const session_id = useMemo(() => {
       const screenshotPayload = bestFileKey ? { candidate_screenshots_path: bestFileKey } : {}; 
 
       const payload = {
-        duration: Math.abs(Math.ceil(totalDurationInMins)),
+        duration: totalDurationInSeconds,
         interview_date: lastQuestionTime,
         auth_token: videoSDKToken,
         room_id: meetingId,
@@ -1265,8 +1281,8 @@ const session_id = useMemo(() => {
   useEffect(() => {
     if (isInterviewStarted && questions.length && questionNo >= questions.length) {
       if (isRecording) {
-        stopRecording();
-      }
+      stopRecording();
+    }
       setQuestions([]);
       playConclude();
     }
@@ -1361,9 +1377,7 @@ const session_id = useMemo(() => {
 
           const lastQuestionTime = dayjs().toISOString();
 
-          const firstQuesStartTime = allQuestions[0].start_time;
-          const lastQuesEndTime = allQuestions[allQuestions.length - 1].end_time || lastQuestionTime;
-          const totalDurationInMins = (new Date(lastQuesEndTime).getTime() - new Date(firstQuesStartTime).getTime()) / 1000 / 60;
+          const totalDurationInSeconds = calculateTotalDurationInSeconds(lastQuestionTime);
 
           const calculateTotalTime = (intervals: any[]) => {
             return (
@@ -1396,7 +1410,7 @@ const session_id = useMemo(() => {
           const screenshotPayload = lastFileKey ? { candidate_screenshots_path: lastFileKey } : {};
 
           const payload = {
-            duration: Math.abs(Math.ceil(totalDurationInMins)),
+            duration: totalDurationInSeconds,
             interview_date: lastQuestionTime,
             auth_token: videoSDKToken,
             room_id: meetingId,
