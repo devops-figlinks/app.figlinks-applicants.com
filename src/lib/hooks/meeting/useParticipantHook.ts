@@ -1,4 +1,6 @@
 import { warningPopper } from "@/helpers/popper/warningPopper";
+import { detectFacesAPI, getVideoSDKTokenAPI } from "@/https/services/videoSDK";
+import { decodeToVideoSDKToken } from "@/lib/helpers/decodeToVideoSDKToken";
 import {
   IuseParticipantHookReturnType,
   ParticipantViewProps,
@@ -75,6 +77,10 @@ const useParticipantHook = (
   const [processedStream, setProcessedStream] = useState(null);
   const [processedData, setProcessedData] = useState<any>({});
   const [firstAlert, setFirstAlert] = useState<boolean>(false);
+  const [apiFaceCount, setApiFaceCount] = useState<number>(0);
+  const videoSdkTokenRef = useRef<string | null>(null);
+  const isDetectingRef = useRef(false);
+  const captureVideoRef = useRef<HTMLVideoElement | null>(null);
   useEffect(() => {
     if (pathname) {
       const pathSegments = pathname.split("/");
@@ -86,9 +92,18 @@ const useParticipantHook = (
         setThresholds({ horizontal: 47, vertical: 47 });
       }
     }
-  }, [pathname])
+  }, [pathname]);
 
-
+  useEffect(() => {
+    getVideoSDKTokenAPI()
+      .then((response) => {
+        if (response?.status === 200 || response?.status === 201) {
+          const { accessToken } = response.data.data;
+          videoSdkTokenRef.current = decodeToVideoSDKToken(accessToken);
+        }
+      })
+      .catch((err) => console.error("VideoSDK token fetch error:", err));
+  }, []);
 
   const logEvent = ({
     kind,
@@ -282,25 +297,14 @@ const useParticipantHook = (
       if (mediaElement && "setSinkId" in mediaElement) {
         try {
           await mediaElement.setSinkId(selectedDeviceId || "");
-          console.warn(
-            `Audio output device set to ${selectedDeviceId || "default"
-            } for element`,
-            mediaElement
-          );
         } catch (err: any) {
           if (err?.name === "AbortError") {
-            console.error(
-              "Failed to set audio output device: The operation was aborted."
-            );
           } else {
             console.error("Failed to set audio output device:", err);
           }
           success = false;
         }
       } else {
-        console.error(
-          "setSinkId is not supported on this media element or it is not accessible."
-        );
         success = false;
       }
     }
@@ -321,6 +325,38 @@ const useParticipantHook = (
       return mediaStream;
     }
   }, [webcamStream, webcamOn, joined]);
+
+  useEffect(() => {
+    if (!captureVideoRef.current) {
+      const el = document.createElement("video");
+      el.muted = true;
+      el.playsInline = true;
+      captureVideoRef.current = el;
+    }
+    if (videoStream) {
+      captureVideoRef.current.srcObject = videoStream;
+      captureVideoRef.current.play().catch(() => {});
+    } else {
+      captureVideoRef.current.srcObject = null;
+    }
+    return () => {
+      if (captureVideoRef.current) {
+        captureVideoRef.current.srcObject = null;
+      }
+    };
+  }, [videoStream]);
+
+  const captureFrame = (): string | null => {
+    const videoEl = captureVideoRef.current;
+    if (!videoEl || videoEl.readyState < 2) return null;
+    const canvas = document.createElement("canvas");
+    canvas.width = videoEl.videoWidth || 320;
+    canvas.height = videoEl.videoHeight || 240;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL("image/jpeg", 0.7);
+  };
 
   useEffect(() => {
     setIsWebcamOnInMeeting(webcamOn);
@@ -477,6 +513,27 @@ const useParticipantHook = (
     handleStartFaceDetection()
   }, [webcamOn, videoStream, faceDetectionProcessor]);
 
+  useEffect(() => {
+    if (!webcamOn || !videoStream) return;
+    const detectFacesInterval = setInterval(async () => {
+      if (isDetectingRef.current || !videoSdkTokenRef.current) return;
+      const base64 = captureFrame();
+      if (!base64) return;
+      isDetectingRef.current = true;
+      try {
+        const result = await detectFacesAPI({
+          token: videoSdkTokenRef.current,
+          imageBase64: base64,
+        });
+        setApiFaceCount(result.number_of_faces ?? 0);
+      } catch {
+      } finally {
+        isDetectingRef.current = false;
+      }
+    }, 3000);
+    return () => clearInterval(detectFacesInterval);
+  }, [webcamOn, videoStream]);
+
 
   useEffect(() => {
     if (!processedData?.faceLandMark || !isRecording || (interviewType === "MCQ" && currentStage != "questions")) return;
@@ -534,40 +591,34 @@ const useParticipantHook = (
 
 
   useEffect(() => {
+    if (!isRecording || (interviewType === "MCQ" && currentStage != "questions")) return;
 
-    if (!processedData?.faceDetected || processedData.faceDetected === 0) {
+    if (apiFaceCount === 0) {
       detectionCounts.current.lastFaceCount = 0;
-
       detectionCounts.current.no_face_detected = true;
       detectionCounts.current.face_detected = false;
-
       return;
     }
 
     detectionCounts.current.no_face_detected = false;
     detectionCounts.current.face_detected = true;
 
-    const faceCount = processedData.faceDetected;
     const multiFacesThreshold = 1;
-    const multiFaces = faceCount > multiFacesThreshold ? faceCount : 1;
 
-
-    if (multiFaces > multiFacesThreshold) {
-
+    if (apiFaceCount > multiFacesThreshold) {
       const awayTime = Date.now();
       if (!detectionCounts.current.multiple_face_detected) {
         detectionCounts.current.multiple_face_detected_count += 1;
         detectionCounts.current.eyeTimeIntervals.multiFaces.push({ awayTime, inTime: null });
       }
-      detectionCounts.current.lastFaceCount = multiFaces;
+      detectionCounts.current.lastFaceCount = apiFaceCount;
       detectionCounts.current.multiple_face_detected = true;
-      
+
       if (!firstAlert) {
         warningPopper("Multiple faces detected");
-        setFirstAlert(true)
+        setFirstAlert(true);
       }
     } else {
-
       if (detectionCounts.current.multiple_face_detected) {
         const inTime = Date.now();
         const lastInterval = detectionCounts.current.eyeTimeIntervals.multiFaces.slice(-1)[0];
@@ -578,16 +629,16 @@ const useParticipantHook = (
         detectionCounts.current.multiple_face_detected = false;
       }
     }
-  }, [processedData, webcamOn, videoStream, faceDetectionProcessor, isRecording]);
+  }, [apiFaceCount, isRecording]);
 
   const multiFaceIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const latestProcessedDataRef = useRef<any>({});
+  const latestApiFaceCountRef = useRef<number>(0);
   useEffect(() => {
-    if (processedData?.faceDetected === 1) {
-      setFirstAlert(false)
+    if (apiFaceCount === 1) {
+      setFirstAlert(false);
     }
-    latestProcessedDataRef.current = processedData;
-  }, [processedData]);
+    latestApiFaceCountRef.current = apiFaceCount;
+  }, [apiFaceCount]);
 
   useEffect(() => {
     if (firstAlert) {
@@ -595,9 +646,7 @@ const useParticipantHook = (
         clearInterval(multiFaceIntervalRef.current);
       }
       multiFaceIntervalRef.current = setInterval(() => {
-        const currentFaceCount = latestProcessedDataRef.current?.faceDetected;
-
-        if (currentFaceCount > 1) {
+        if (latestApiFaceCountRef.current > 1) {
           warningPopper("Multiple faces are detected");
         }
       }, 5000);
