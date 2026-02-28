@@ -1,6 +1,33 @@
 import { $fetch } from "../fetch";
 import { BASEURL } from "@/helpers/getBaseURL";
 
+export const verifyFaceAPI = async ({
+  token,
+  referenceImage,
+  currentImage,
+}: {
+  token: string;
+  referenceImage: string;
+  currentImage: string;
+}): Promise<{ is_same_person: boolean; confidence: number }> => {
+  const response = await fetch(
+    "https://api.videosdk.live/ai/v1/face-verification/verify",
+    {
+      method: "POST",
+      headers: {
+        Authorization: token,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ img1: referenceImage, img2: currentImage }),
+    }
+  );
+  if (response.status === 200 || response.status === 201) {
+    const data = await response.json();
+    return { is_same_person: data.verified, confidence: data.score };
+  }
+  throw await response.json().catch(() => response);
+};
+
 export const detectFacesAPI = async ({
   token,
   imageBase64,

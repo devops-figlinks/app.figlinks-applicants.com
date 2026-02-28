@@ -8,7 +8,7 @@ import {
 } from "@videosdk.live/react-sdk/dist/types/deviceInfo";
 import { Participant } from "@videosdk.live/react-sdk/dist/types/participant";
 import { Permission } from "@videosdk.live/react-sdk/dist/types/permission";
-import { Dispatch, MouseEvent, MutableRefObject, SetStateAction } from "react";
+import { Dispatch, MouseEvent, RefObject, SetStateAction } from "react";
 import { IWebHookData } from "./candidates";
 
 export interface IPermissions {
@@ -240,6 +240,7 @@ export interface IUseMeetingHookReturnType {
   setVideoStreamOff: Dispatch<SetStateAction<boolean>>;
   isSafari: boolean;
   isIOS: () => boolean
+  captureStartScreenshotRef: RefObject<(() => Promise<void>) | null>;
 }
 
 export interface IQuesObj {
@@ -322,6 +323,7 @@ export interface ParticipantViewProps {
   videoStreamOff: boolean;
   setVideoStreamOff: Dispatch<SetStateAction<boolean>>;
   isSafari: boolean;
+  captureStartScreenshotRef?: RefObject<(() => Promise<void>) | null>;
 }
 export interface McqParticipantViewProps {
   participantId: string;
@@ -425,7 +427,7 @@ export interface IMobileBottomActionBarInMeeting {
   isSafari: boolean;
   isInterviewComplete: boolean;
   onIOSPlayClick: OnIOSPlayClickType;
-  audioDataRef?: MutableRefObject<any>;
+  audioDataRef?: RefObject<any>;
   isIosInterview: boolean;
   isTimerCompleted?: boolean;
   handleManualNextQuestion?: () => void;
@@ -512,9 +514,9 @@ export interface IUseQuestionHookReturnType {
   remainingTime: number;
   setCountQuestion: Dispatch<SetStateAction<number>>;
   playAudioFromQuestions: () => void;
-  countdownRef?: MutableRefObject<ReturnType<typeof setTimeout> | null>;
+  countdownRef?: RefObject<ReturnType<typeof setTimeout> | null>;
   setTimer1: Dispatch<SetStateAction<boolean>>;
-  audioDataRef?: MutableRefObject<any>;
+  audioDataRef?: RefObject<any>;
   isIosInterview: boolean;
   onIOSPlayClick: OnIOSPlayClickType;
   isTimerCompleted: boolean;
@@ -534,7 +536,7 @@ export interface IQuestioningBlock {
   questions: IQuesObj[];
   isSettingUpInterview: boolean;
   isIntroduction: boolean;
-  audioRef: MutableRefObject<HTMLAudioElement | null>;
+  audioRef: RefObject<HTMLAudioElement | null>;
   startRec: () => void;
   setIsInterviewCompleted: Dispatch<SetStateAction<boolean>>;
   setQuestions: Dispatch<SetStateAction<IQuesObj[]>>;
@@ -575,6 +577,8 @@ export interface IQuestioningBlock {
   joined?: string | null;
   videoStreamOff: boolean;
   setVideoStreamOff: Dispatch<SetStateAction<boolean>>;
+  captureStartScreenshotRef?: RefObject<(() => Promise<void>) | null>;
+
 }
 
 export interface IMcqExamBlock {

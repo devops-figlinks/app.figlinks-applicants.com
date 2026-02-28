@@ -61,6 +61,7 @@ const useQuestionsHook = ({
   videoStreamOff,
   setVideoStreamOff,
   joined,
+  captureStartScreenshotRef,
 }: IQuestioningBlock): IUseQuestionHookReturnType => {
   const pathname = usePathname();
   const { interview_id, candidate_code } = useParams();
@@ -376,7 +377,11 @@ const useQuestionsHook = ({
       }
     }
   };
-
+  useEffect(() => {
+    if (captureStartScreenshotRef) {
+      captureStartScreenshotRef.current = () => captureAndUpload("fixed_start");
+    }
+  }, []);
   useEffect(() => {
     if (!isInterviewStarted || !isRecording || interviewCompleted) return;
 
@@ -385,8 +390,6 @@ const useQuestionsHook = ({
 
     if (questionNo === 0 && !fixedScreenshotFlags.current.start) {
       fixedScreenshotFlags.current.start = true;
-      captureAndUpload("fixed_start");
-      
       eyeTransitionCaptureCount.current = 0;
       multiFaceCaptureCount.current = 0;
       cameraDisableCaptureCount.current = 0;
@@ -752,6 +755,7 @@ const useQuestionsHook = ({
           multiple_face_detected: detectionCounts.current.multiple_face_detected_count >= 1,
           multiple_face_detected_count: detectionCounts.current.multiple_face_detected_count,
           multiple_face_detected_time: calculateTotalEyeTime(eyeTimeIntervals.multiFaces),
+          face_verification_mismatch_count: detectionCounts.current.face_verification_mismatch_count || 0,
         },
         meeting_room_id: meetingId,
         ...screenshotPayload,
@@ -1443,6 +1447,7 @@ const useQuestionsHook = ({
               multiple_face_detected: detectionCounts.current.multiple_face_detected_count >= 1,
               multiple_face_detected_count: detectionCounts.current.multiple_face_detected_count,
               multiple_face_detected_time: calculateTotalEyeTime(eyeTimeIntervals.multiFaces),
+              face_verification_mismatch_count: detectionCounts.current.face_verification_mismatch_count || 0,
             },
             meeting_room_id: meetingId,
             ...screenshotPayload,

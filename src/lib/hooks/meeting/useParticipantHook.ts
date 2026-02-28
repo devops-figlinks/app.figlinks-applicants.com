@@ -1,5 +1,5 @@
 import { warningPopper } from "@/helpers/popper/warningPopper";
-import { detectFacesAPI, getVideoSDKTokenAPI } from "@/https/services/videoSDK";
+import { detectFacesAPI, verifyFaceAPI, getVideoSDKTokenAPI } from "@/https/services/videoSDK";
 import { decodeToVideoSDKToken } from "@/lib/helpers/decodeToVideoSDKToken";
 import {
   IuseParticipantHookReturnType,
@@ -58,7 +58,7 @@ const useParticipantHook = (
     currentStage,
     videoStreamOff,
     setVideoStreamOff,
-
+    captureStartScreenshotRef,
   } = props;
   const { sendEvent } = useBaselimeRum();
 
@@ -80,6 +80,9 @@ const useParticipantHook = (
   const [apiFaceCount, setApiFaceCount] = useState<number>(0);
   const videoSdkTokenRef = useRef<string | null>(null);
   const isDetectingRef = useRef(false);
+  const isVerifyingRef = useRef(false);
+  const consecutiveMismatchRef = useRef(0);
+  const referenceImageRef = useRef<string | null>(null);
   const captureVideoRef = useRef<HTMLVideoElement | null>(null);
   useEffect(() => {
     if (pathname) {
@@ -533,7 +536,92 @@ const useParticipantHook = (
     }, 3000);
     return () => clearInterval(detectFacesInterval);
   }, [webcamOn, videoStream]);
+  useEffect(() => {
+    if (!isRecording || !isInterviewStarted || referenceImageRef.current || !videoStream) return;
+    if (interviewType === "MCQ" && currentStage !== "questions") return;
 
+    let cancelled = false;
+
+    const captureAndValidateReference = async () => {
+      if (cancelled) return;
+      if (!videoSdkTokenRef.current) {
+        setTimeout(captureAndValidateReference, 500);
+        return;
+      }
+      const base64 = captureFrame();
+      if (!base64) {
+        setTimeout(captureAndValidateReference, 500);
+        return;
+      }
+      try {
+        const [detectResult] = await Promise.all([
+          detectFacesAPI({ token: videoSdkTokenRef.current, imageBase64: base64 }),
+          captureStartScreenshotRef?.current?.(),
+        ]);
+        if (cancelled) return;
+        setApiFaceCount(detectResult.number_of_faces ?? 0);
+        latestApiFaceCountRef.current = detectResult.number_of_faces ?? 0;
+        if (detectResult.number_of_faces === 1) {
+          referenceImageRef.current = base64;
+          runFaceVerification();
+        } else {
+          setTimeout(captureAndValidateReference, 1000);
+        }
+      } catch {
+        if (!cancelled && !referenceImageRef.current) {
+          referenceImageRef.current = base64;
+        }
+      }
+    };
+
+    captureAndValidateReference();
+    return () => { cancelled = true; };
+  }, [isRecording, isInterviewStarted, videoStream, interviewType, currentStage]);
+
+  const runFaceVerification = async () => {
+    if (isVerifyingRef.current || !videoSdkTokenRef.current || !referenceImageRef.current) return;
+    if (latestApiFaceCountRef.current !== 1) return;
+    const currentImage = captureFrame();
+    if (!currentImage) return;
+    isVerifyingRef.current = true;
+    try {
+      const result = await verifyFaceAPI({
+        token: videoSdkTokenRef.current,
+        referenceImage: referenceImageRef.current,
+        currentImage,
+      });
+      if (!result.is_same_person) {
+        consecutiveMismatchRef.current += 1;
+        if (consecutiveMismatchRef.current >= 2) {
+          const awayTime = Date.now();
+          detectionCounts.current.face_verification_mismatch_count += 1;
+          detectionCounts.current.eyeTimeIntervals.faceVerification.push({ awayTime, inTime: Date.now() });
+          warningPopper("Face verification failed. Ensure you are the same person who started the interview.");
+          consecutiveMismatchRef.current = 0;
+        }
+      } else {
+        consecutiveMismatchRef.current = 0;
+      }
+    } catch {
+    } finally {
+      isVerifyingRef.current = false;
+    }
+  };
+
+  useEffect(() => {
+    if (!isRecording || !isInterviewStarted || !webcamOn || !videoStream || (interviewType === "MCQ" && currentStage !== "questions")) return;
+    const verifyInterval = setInterval(runFaceVerification, 10000);
+    return () => clearInterval(verifyInterval);
+  }, [isRecording, isInterviewStarted, webcamOn, videoStream, interviewType, currentStage]);
+
+  const prevApiFaceCountRef = useRef(apiFaceCount);
+  useEffect(() => {
+    const prev = prevApiFaceCountRef.current;
+    prevApiFaceCountRef.current = apiFaceCount;
+    if (prev > 1 && apiFaceCount === 1 && isRecording && isInterviewStarted && referenceImageRef.current) {
+      runFaceVerification();
+    }
+  }, [apiFaceCount, isRecording, isInterviewStarted]);
 
   useEffect(() => {
     if (!processedData?.faceLandMark || !isRecording || (interviewType === "MCQ" && currentStage != "questions")) return;

@@ -84,12 +84,14 @@ const useMeetingHook = ({
     lastFaceCount: 0,
     no_face_detected: false,
     face_detected: false,
+    face_verification_mismatch_count: 0,
     eyeTimeIntervals: {
       left: [],
       right: [],
       up: [],
       multiFaces: [],
       down: [],
+      faceVerification: [] as { awayTime: number; inTime: number | null }[],
     },
   });
 
@@ -285,6 +287,7 @@ const useMeetingHook = ({
   } = useParticipant(firstKey);
 
   const imageCountRef = useRef(0);
+  const captureStartScreenshotRef = useRef<(() => Promise<void>) | null>(null);
 
   async function imageCapture() {
     if (webcamOn && webcamStream) {
@@ -769,6 +772,7 @@ const useMeetingHook = ({
     setVideoStreamOff,
     isSafari,
     isIOS,
+    captureStartScreenshotRef,
   };
 };
 
