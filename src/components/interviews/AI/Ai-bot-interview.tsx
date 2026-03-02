@@ -465,6 +465,8 @@ export default function GeminiInterviewBot() {
           multiple_face_detected: false,
           multiple_face_detected_count: 0,
           multiple_face_detected_time: 0,
+          face_verification_mismatch_count: 0,
+          total_face_verification_mismatch_time: 0,
           user_absence_time: 0,
           eye_transition_count: 0,
         },
