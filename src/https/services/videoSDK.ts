@@ -52,6 +52,30 @@ export const detectFacesAPI = async ({
   throw await response.json().catch(() => response);
 };
 
+export const detectSpoofAPI = async ({
+  token,
+  imageBase64,
+}: {
+  token: string;
+  imageBase64: string;
+}): Promise<{ spoof_detected: boolean; accuracy: number }> => {
+  const response = await fetch(
+    "https://api.videosdk.live/ai/v1/face-verification/detect-spoof",
+    {
+      method: "POST",
+      headers: {
+        Authorization: token,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ img: imageBase64 }),
+    }
+  );
+  if (response.status === 200 || response.status === 201) {
+    return await response.json();
+  }
+  throw await response.json().catch(() => response);
+};
+
 export const getVideoSDKTokenAPI = async () => {
   try {
     return await $fetch.get(`/auth/videosdk`);
