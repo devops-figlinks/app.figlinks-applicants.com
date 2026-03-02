@@ -84,6 +84,7 @@ const useMeetingHook = ({
     lastFaceCount: 0,
     no_face_detected: false,
     face_detected: false,
+    face_verification_mismatch: false,
     face_verification_mismatch_count: 0,
     eyeTimeIntervals: {
       left: [],

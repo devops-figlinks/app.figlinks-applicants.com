@@ -81,7 +81,6 @@ const useParticipantHook = (
   const videoSdkTokenRef = useRef<string | null>(null);
   const isDetectingRef = useRef(false);
   const isVerifyingRef = useRef(false);
-  const consecutiveMismatchRef = useRef(0);
   const referenceImageRef = useRef<string | null>(null);
   const captureVideoRef = useRef<HTMLVideoElement | null>(null);
   useEffect(() => {
@@ -484,36 +483,40 @@ const useParticipantHook = (
     return new FaceDetectionProcessor();
   }, []);
 
+  const isFaceDetectionRunningRef = useRef(false);
+
   useEffect(() => {
+    if (!webcamOn || !videoStream) return;
+
+    let cancelled = false;
+
     const handleStartFaceDetection = async () => {
-      if (videoStream) {
-        try {
-          const processedStream = await faceDetectionProcessor.start({
-            stream: videoStream,
-            options: {
-              interval: 500,
-            },
-            callback: function (data: any) {
-              setProcessedData(data);
-            },
-          });
-          setProcessedStream(processedStream);
-        } catch (err) {
-          console.error("Face detection error:", err);
-        }
+      if (isFaceDetectionRunningRef.current) return;
+      try {
+        isFaceDetectionRunningRef.current = true;
+        const processedStream = await faceDetectionProcessor.start({
+          stream: videoStream,
+          options: { interval: 500 },
+          callback: function (data: any) {
+            if (!cancelled) setProcessedData(data);
+          },
+        });
+        if (!cancelled) setProcessedStream(processedStream);
+      } catch (err) {
+        isFaceDetectionRunningRef.current = false;
+        console.error("Face detection error:", err);
       }
     };
 
-    if (webcamOn) {
-      handleStartFaceDetection();
+    handleStartFaceDetection();
 
-      return () => {
-        faceDetectionProcessor.stop();
-        setProcessedStream(null);
-        setProcessedData({});
-      };
-    }
-    handleStartFaceDetection()
+    return () => {
+      cancelled = true;
+      isFaceDetectionRunningRef.current = false;
+      faceDetectionProcessor.stop();
+      setProcessedStream(null);
+      setProcessedData({});
+    };
   }, [webcamOn, videoStream, faceDetectionProcessor]);
 
   useEffect(() => {
@@ -591,15 +594,22 @@ const useParticipantHook = (
         currentImage,
       });
       if (!result.is_same_person) {
-        consecutiveMismatchRef.current += 1;
-        if (consecutiveMismatchRef.current >= 2) {
+        // State flip: first mismatch in a streak → open a new interval and increment count
+        if (!detectionCounts.current.face_verification_mismatch) {
           const awayTime = Date.now();
           detectionCounts.current.face_verification_mismatch_count += 1;
-          detectionCounts.current.eyeTimeIntervals.faceVerification.push({ awayTime, inTime: Date.now() });
-          consecutiveMismatchRef.current = 0;
+          detectionCounts.current.eyeTimeIntervals.faceVerification.push({ awayTime, inTime: null });
+          detectionCounts.current.face_verification_mismatch = true;
         }
       } else {
-        consecutiveMismatchRef.current = 0;
+        // Verified as same person → close the open mismatch interval
+        if (detectionCounts.current.face_verification_mismatch) {
+          const lastInterval = detectionCounts.current.eyeTimeIntervals.faceVerification.slice(-1)[0];
+          if (lastInterval && lastInterval.inTime === null) {
+            lastInterval.inTime = Date.now();
+          }
+          detectionCounts.current.face_verification_mismatch = false;
+        }
       }
     } catch {
     } finally {
@@ -609,7 +619,7 @@ const useParticipantHook = (
 
   useEffect(() => {
     if (!isRecording || !isInterviewStarted || !webcamOn || !videoStream || (interviewType === "MCQ" && currentStage !== "questions")) return;
-    const verifyInterval = setInterval(runFaceVerification, 10000);
+    const verifyInterval = setInterval(runFaceVerification, 5000);
     return () => clearInterval(verifyInterval);
   }, [isRecording, isInterviewStarted, webcamOn, videoStream, interviewType, currentStage]);
 
