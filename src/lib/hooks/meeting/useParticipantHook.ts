@@ -596,7 +596,6 @@ const useParticipantHook = (
           const awayTime = Date.now();
           detectionCounts.current.face_verification_mismatch_count += 1;
           detectionCounts.current.eyeTimeIntervals.faceVerification.push({ awayTime, inTime: Date.now() });
-          warningPopper("Face verification failed. Ensure you are the same person who started the interview.");
           consecutiveMismatchRef.current = 0;
         }
       } else {
