@@ -637,7 +637,6 @@ const useParticipantHook = (
         currentImage,
       });
       if (!result.is_same_person) {
-        // Only count the START of a new mismatch streak (consecutive mismatches = count 1)
         if (!isMismatchStreakRef.current) {
           const awayTime = Date.now();
           detectionCounts.current.face_verification_mismatch_count += 1;
@@ -646,7 +645,6 @@ const useParticipantHook = (
           isMismatchStreakRef.current = true;
         }
       } else {
-        // Verified as same person → close the open mismatch interval
         if (isMismatchStreakRef.current) {
           const lastInterval = detectionCounts.current.eyeTimeIntervals.faceVerification.slice(-1)[0];
           if (lastInterval && lastInterval.inTime === null) {
