@@ -67,6 +67,7 @@ const McqExamScreen = (props: IMcqExamBlock & IQuestioningBlock) => {
     videoStreamOff,
     setVideoStreamOff,
     isSafari,
+    captureStartScreenshotRef,
   } = props;
   const {
     currentStage,
@@ -245,6 +246,8 @@ const McqExamScreen = (props: IMcqExamBlock & IQuestioningBlock) => {
                   videoStreamOff={videoStreamOff}
                   setVideoStreamOff={setVideoStreamOff}
                   isSafari={isSafari}
+                  captureStartScreenshotRef={captureStartScreenshotRef}
+
                 />
               ))}
             </div>

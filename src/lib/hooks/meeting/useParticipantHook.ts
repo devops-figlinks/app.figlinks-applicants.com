@@ -1,5 +1,5 @@
 import { warningPopper } from "@/helpers/popper/warningPopper";
-import { detectFacesAPI, getVideoSDKTokenAPI } from "@/https/services/videoSDK";
+import { detectFacesAPI, detectSpoofAPI, verifyFaceAPI, getVideoSDKTokenAPI } from "@/https/services/videoSDK";
 import { decodeToVideoSDKToken } from "@/lib/helpers/decodeToVideoSDKToken";
 import {
   IuseParticipantHookReturnType,
@@ -58,7 +58,7 @@ const useParticipantHook = (
     currentStage,
     videoStreamOff,
     setVideoStreamOff,
-
+    captureStartScreenshotRef,
   } = props;
   const { sendEvent } = useBaselimeRum();
 
@@ -80,6 +80,10 @@ const useParticipantHook = (
   const [apiFaceCount, setApiFaceCount] = useState<number>(0);
   const videoSdkTokenRef = useRef<string | null>(null);
   const isDetectingRef = useRef(false);
+  const isVerifyingRef = useRef(false);
+  const isMismatchStreakRef = useRef(false);
+  const referenceImageRef = useRef<string | null>(null);
+  const spoofCacheRef = useRef<{ spoof_detected: boolean; checkedAtCount: number } | null>(null);
   const captureVideoRef = useRef<HTMLVideoElement | null>(null);
   useEffect(() => {
     if (pathname) {
@@ -481,40 +485,45 @@ const useParticipantHook = (
     return new FaceDetectionProcessor();
   }, []);
 
+  const isFaceDetectionRunningRef = useRef(false);
+
   useEffect(() => {
+    if (!webcamOn || !videoStream || !isRecording) return;
+
+    let cancelled = false;
+
     const handleStartFaceDetection = async () => {
-      if (videoStream) {
-        try {
-          const processedStream = await faceDetectionProcessor.start({
-            stream: videoStream,
-            options: {
-              interval: 500,
-            },
-            callback: function (data: any) {
-              setProcessedData(data);
-            },
-          });
-          setProcessedStream(processedStream);
-        } catch (err) {
-          console.error("Face detection error:", err);
-        }
+      if (isFaceDetectionRunningRef.current) return;
+      try {
+        isFaceDetectionRunningRef.current = true;
+        const processedStream = await faceDetectionProcessor.start({
+          stream: videoStream,
+          options: { interval: 500 },
+          callback: function (data: any) {
+            if (!cancelled) setProcessedData(data);
+          },
+        });
+        if (!cancelled) setProcessedStream(processedStream);
+      } catch (err) {
+        isFaceDetectionRunningRef.current = false;
+        console.error("Face detection error:", err);
       }
     };
 
-    if (webcamOn) {
-      handleStartFaceDetection();
+    handleStartFaceDetection();
 
-      return () => {
-        faceDetectionProcessor.stop();
-        setProcessedStream(null);
-        setProcessedData({});
-      };
-    }
-    handleStartFaceDetection()
-  }, [webcamOn, videoStream, faceDetectionProcessor]);
+    return () => {
+      cancelled = true;
+      isFaceDetectionRunningRef.current = false;
+      faceDetectionProcessor.stop();
+      setProcessedStream(null);
+      setProcessedData({});
+      spoofCacheRef.current = null;
+    };
+  }, [webcamOn, videoStream, isRecording, faceDetectionProcessor]);
 
   useEffect(() => {
-    if (!webcamOn || !videoStream) return;
+    if (!webcamOn || !videoStream || !isRecording) return;
     const detectFacesInterval = setInterval(async () => {
       if (isDetectingRef.current || !videoSdkTokenRef.current) return;
       const base64 = captureFrame();
@@ -525,15 +534,146 @@ const useParticipantHook = (
           token: videoSdkTokenRef.current,
           imageBase64: base64,
         });
-        setApiFaceCount(result.number_of_faces ?? 0);
+        let faceCount = result.number_of_faces ?? 0;
+        if (faceCount > 1) {
+          const needsCheck =
+            spoofCacheRef.current === null ||
+            faceCount > spoofCacheRef.current.checkedAtCount;
+          if (needsCheck) {
+            try {
+              const spoofResult = await detectSpoofAPI({
+                token: videoSdkTokenRef.current,
+                imageBase64: base64,
+              });
+              spoofCacheRef.current = { spoof_detected: spoofResult.spoof_detected && spoofResult.accuracy > 0, checkedAtCount: faceCount };
+            } catch {
+              spoofCacheRef.current = { spoof_detected: false, checkedAtCount: faceCount };
+            }
+          }
+          if (spoofCacheRef.current?.spoof_detected) faceCount = 1;
+        } else {
+          spoofCacheRef.current = null;
+        }
+        setApiFaceCount(faceCount);
       } catch {
       } finally {
         isDetectingRef.current = false;
       }
     }, 3000);
     return () => clearInterval(detectFacesInterval);
-  }, [webcamOn, videoStream]);
+  }, [webcamOn, videoStream, isRecording]);
+  useEffect(() => {
+    if (!isRecording || !isInterviewStarted || referenceImageRef.current || !videoStream) return;
+    if (interviewType === "MCQ" && currentStage !== "questions") return;
 
+    let cancelled = false;
+
+    const captureAndValidateReference = async () => {
+      if (cancelled) return;
+      if (!videoSdkTokenRef.current) {
+        setTimeout(captureAndValidateReference, 500);
+        return;
+      }
+      const base64 = captureFrame();
+      if (!base64) {
+        setTimeout(captureAndValidateReference, 500);
+        return;
+      }
+      try {
+        const [detectResult] = await Promise.all([
+          detectFacesAPI({ token: videoSdkTokenRef.current, imageBase64: base64 }),
+          captureStartScreenshotRef?.current?.(),
+        ]);
+        if (cancelled) return;
+        let faceCount = detectResult.number_of_faces ?? 0;
+        if (faceCount > 1) {
+          const needsCheck =
+            spoofCacheRef.current === null ||
+            faceCount > spoofCacheRef.current.checkedAtCount;
+          if (needsCheck) {
+            try {
+              const spoofResult = await detectSpoofAPI({
+                token: videoSdkTokenRef.current,
+                imageBase64: base64,
+              });
+              spoofCacheRef.current = { spoof_detected: spoofResult.spoof_detected && spoofResult.accuracy > 0, checkedAtCount: faceCount };
+            } catch {
+              spoofCacheRef.current = { spoof_detected: false, checkedAtCount: faceCount };
+            }
+          }
+          if (spoofCacheRef.current?.spoof_detected) faceCount = 1;
+        } else {
+          spoofCacheRef.current = null;
+        }
+        setApiFaceCount(faceCount);
+        latestApiFaceCountRef.current = faceCount;
+        if (faceCount === 1) {
+          referenceImageRef.current = base64;
+          runFaceVerification();
+        } else {
+          setTimeout(captureAndValidateReference, 1000);
+        }
+      } catch {
+        if (!cancelled && !referenceImageRef.current) {
+          referenceImageRef.current = base64;
+        }
+      }
+    };
+
+    captureAndValidateReference();
+    return () => { cancelled = true; };
+  }, [isRecording, isInterviewStarted, videoStream, interviewType, currentStage]);
+
+  const runFaceVerification = async () => {
+    if (isVerifyingRef.current || !videoSdkTokenRef.current || !referenceImageRef.current) return;
+    if (latestApiFaceCountRef.current !== 1) return;
+    const currentImage = captureFrame();
+    if (!currentImage) return;
+    isVerifyingRef.current = true;
+    try {
+      const result = await verifyFaceAPI({
+        token: videoSdkTokenRef.current,
+        referenceImage: referenceImageRef.current,
+        currentImage,
+      });
+      if (!result.is_same_person) {
+        if (!isMismatchStreakRef.current) {
+          const awayTime = Date.now();
+          detectionCounts.current.face_verification_mismatch_count += 1;
+          detectionCounts.current.eyeTimeIntervals.faceVerification.push({ awayTime, inTime: null });
+          detectionCounts.current.face_verification_mismatch = true;
+          isMismatchStreakRef.current = true;
+        }
+      } else {
+        if (isMismatchStreakRef.current) {
+          const lastInterval = detectionCounts.current.eyeTimeIntervals.faceVerification.slice(-1)[0];
+          if (lastInterval && lastInterval.inTime === null) {
+            lastInterval.inTime = Date.now();
+          }
+          detectionCounts.current.face_verification_mismatch = false;
+          isMismatchStreakRef.current = false;
+        }
+      }
+    } catch {
+    } finally {
+      isVerifyingRef.current = false;
+    }
+  };
+
+  useEffect(() => {
+    if (!isRecording || !isInterviewStarted || !webcamOn || !videoStream || (interviewType === "MCQ" && currentStage !== "questions")) return;
+    const verifyInterval = setInterval(runFaceVerification, 5000);
+    return () => clearInterval(verifyInterval);
+  }, [isRecording, isInterviewStarted, webcamOn, videoStream, interviewType, currentStage]);
+
+  const prevApiFaceCountRef = useRef(apiFaceCount);
+  useEffect(() => {
+    const prev = prevApiFaceCountRef.current;
+    prevApiFaceCountRef.current = apiFaceCount;
+    if (prev > 1 && apiFaceCount === 1 && isRecording && isInterviewStarted && referenceImageRef.current) {
+      runFaceVerification();
+    }
+  }, [apiFaceCount, isRecording, isInterviewStarted]);
 
   useEffect(() => {
     if (!processedData?.faceLandMark || !isRecording || (interviewType === "MCQ" && currentStage != "questions")) return;
@@ -597,6 +737,13 @@ const useParticipantHook = (
       detectionCounts.current.lastFaceCount = 0;
       detectionCounts.current.no_face_detected = true;
       detectionCounts.current.face_detected = false;
+      if (detectionCounts.current.multiple_face_detected) {
+        const lastInterval = detectionCounts.current.eyeTimeIntervals.multiFaces.slice(-1)[0];
+        if (lastInterval && lastInterval.inTime === null) {
+          lastInterval.inTime = Date.now();
+        }
+        detectionCounts.current.multiple_face_detected = false;
+      }
       return;
     }
 
@@ -634,7 +781,7 @@ const useParticipantHook = (
   const multiFaceIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const latestApiFaceCountRef = useRef<number>(0);
   useEffect(() => {
-    if (apiFaceCount === 1) {
+    if (apiFaceCount <= 1) {
       setFirstAlert(false);
     }
     latestApiFaceCountRef.current = apiFaceCount;

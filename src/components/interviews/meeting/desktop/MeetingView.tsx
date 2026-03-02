@@ -114,6 +114,8 @@ const MeetingView: FC<IMeetingViewWebAndMobile> = ({
     videoStreamOff,
     setVideoStreamOff,
     isSafari,
+    captureStartScreenshotRef,
+
   }: IUseMeetingHookReturnType = useMeetingHook({
     onMeetingLeave,
     meetingId,
@@ -214,6 +216,8 @@ const MeetingView: FC<IMeetingViewWebAndMobile> = ({
                     videoStreamOff={videoStreamOff}
                     setVideoStreamOff={setVideoStreamOff}
                     isSafari={isSafari}
+                    captureStartScreenshotRef={captureStartScreenshotRef}
+
                   />
                 ))
               ) : (
@@ -272,6 +276,8 @@ const MeetingView: FC<IMeetingViewWebAndMobile> = ({
                         videoStreamOff={videoStreamOff}
                         setVideoStreamOff={setVideoStreamOff}
                         isSafari={isSafari}
+                        captureStartScreenshotRef={captureStartScreenshotRef}
+
                       />
                     ))}
                   </div>
@@ -324,6 +330,8 @@ const MeetingView: FC<IMeetingViewWebAndMobile> = ({
                       setEndCall={setEndCall}
                       videoStreamOff={videoStreamOff}
                       setVideoStreamOff={setVideoStreamOff}
+                      captureStartScreenshotRef={captureStartScreenshotRef}
+
                     />
                   </div>
                 </div>

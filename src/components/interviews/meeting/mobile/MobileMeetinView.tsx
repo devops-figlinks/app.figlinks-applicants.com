@@ -115,6 +115,7 @@ const MobileMeetingView: FC<IMeetingViewWebAndMobile> = ({
     videoStreamOff,
     setVideoStreamOff,
     isSafari,
+    captureStartScreenshotRef,
   }: IUseMeetingHookReturnType = useMeetingHook({
     onMeetingLeave,
     meetingId,
@@ -277,8 +278,6 @@ const MobileMeetingView: FC<IMeetingViewWebAndMobile> = ({
                 isSettingUpInterview={isSettingUpInterview}
                 isIntroduction={isIntroduction}
                 setIsIntroduction={setIsIntroduction}
-                // audioBlobForNextQuestion={audioBlobForNextQuestion}
-                // setAudioBlobForNextQuestion={setAudioBlobForNextQuestion}
                 interviewData={interviewData}
                 setIsInterviewStarted={setIsInterviewStarted}
                 cameraPermission={cameraPermission}
@@ -296,6 +295,8 @@ const MobileMeetingView: FC<IMeetingViewWebAndMobile> = ({
                 videoStreamOff={videoStreamOff}
                 setVideoStreamOff={setVideoStreamOff}
                 isSafari={isSafari}
+                captureStartScreenshotRef={captureStartScreenshotRef}
+
               />
             ) : (
               <MobileMcqExamScreen
@@ -345,8 +346,6 @@ const MobileMeetingView: FC<IMeetingViewWebAndMobile> = ({
                 isSettingUpInterview={isSettingUpInterview}
                 isIntroduction={isIntroduction}
                 setIsIntroduction={setIsIntroduction}
-                // audioBlobForNextQuestion={audioBlobForNextQuestion}
-                // setAudioBlobForNextQuestion={setAudioBlobForNextQuestion}
                 interviewData={interviewData}
                 setIsInterviewStarted={setIsInterviewStarted}
                 cameraPermission={cameraPermission}
@@ -371,6 +370,7 @@ const MobileMeetingView: FC<IMeetingViewWebAndMobile> = ({
                 videoStreamOff={videoStreamOff}
                 setVideoStreamOff={setVideoStreamOff}
                 isSafari={isSafari}
+                captureStartScreenshotRef={captureStartScreenshotRef}
               />
             ),
           )}
