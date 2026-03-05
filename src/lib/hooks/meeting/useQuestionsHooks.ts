@@ -94,18 +94,19 @@ const useQuestionsHook = ({
     mid: false,
     end: false
   });
-  
+
   const prevMultiFaceCount = useRef(0);
   const prevEyeLeftCount = useRef(0);
   const prevEyeRightCount = useRef(0);
   const prevCameraDisableCount = useRef(0);
-  
+
   const lastEyeCaptureTime = useRef<number>(0);
   const lastMultiFaceCaptureTime = useRef<number>(0);
   const lastCameraDisableCaptureTime = useRef<number>(0);
   const MIN_CAPTURE_INTERVAL = 1000;
-  
+
   const fileKeysRef = useRef<string[]>([]);
+  const interviewStartTimeRef = useRef<number | null>(null);
   const session_id = useMemo(() => {
     if (typeof crypto !== 'undefined' && crypto.randomUUID) {
       return crypto.randomUUID().substring(0, 8);
@@ -192,8 +193,8 @@ const useQuestionsHook = ({
     return new Promise((resolve) => {
       const videoStreamEntry = localParticipant?.streams
         ? Array.from(localParticipant.streams.values()).find(
-            (stream: any) => stream.kind === "video"
-          )
+          (stream: any) => stream.kind === "video"
+        )
         : undefined;
 
       const videoStream = videoStreamEntry?.track
@@ -218,7 +219,7 @@ const useQuestionsHook = ({
       video.addEventListener("error", onError);
 
       video.addEventListener("loadedmetadata", () => {
-        video.play().catch(() => {});
+        video.play().catch(() => { });
 
         let captureAttempts = 0;
         const maxCaptureAttempts = 5;
@@ -233,9 +234,10 @@ const useQuestionsHook = ({
             if (ctx && video.videoWidth > 0 && video.videoHeight > 0) {
               ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
               const base64 = canvas.toDataURL("image/jpeg", 0.92);
-              const timestamp = Date.now();
-              const fileName = `screenshot_${timestamp}.jpg`;
-
+              const elapsedSeconds = interviewStartTimeRef.current
+                ? Math.floor((Date.now() - interviewStartTimeRef.current) / 1000)
+                : 0;
+              const fileName = `screenshot_${elapsedSeconds}s.jpg`;
               video.pause();
               video.srcObject = null;
               video.removeEventListener("error", onError);
@@ -244,7 +246,7 @@ const useQuestionsHook = ({
               return;
             }
           }
-          
+
           captureAttempts++;
           if (captureAttempts < maxCaptureAttempts) {
             requestAnimationFrame(drawFrame);
@@ -294,7 +296,7 @@ const useQuestionsHook = ({
             interviewId: interview_id as string,
             candidateCode: candidate_code as string,
           });
-          
+
           if (retryResponse.status === 200 || retryResponse.status === 201) {
             fileKeysRef.current.push(retryResponse.data.data.file_key);
             return retryResponse.data.data.file_key;
@@ -315,7 +317,7 @@ const useQuestionsHook = ({
             interviewId: interview_id as string,
             candidateCode: candidate_code as string,
           });
-          
+
           if (retryResponse.status === 200 || retryResponse.status === 201) {
             fileKeysRef.current.push(retryResponse.data.data.file_key);
             return retryResponse.data.data.file_key;
@@ -330,7 +332,7 @@ const useQuestionsHook = ({
   const captureAndUpload = async (captureType: string) => {
     try {
       const isAbsenceCapture = captureType.includes("absence");
-      
+
       const imageData = await captureImage();
       if (!imageData) {
         if (isAbsenceCapture) {
@@ -345,7 +347,7 @@ const useQuestionsHook = ({
         }
         return;
       }
-      
+
       const result = await uploadImageData(imageData, captureType);
       if (!result && isAbsenceCapture) {
         for (let i = 0; i < 3; i++) {
@@ -490,7 +492,9 @@ const useQuestionsHook = ({
 
   useEffect(() => {
     if (isInterviewStarted && isRecording && !interviewStartTime) {
-      setInterviewStartTime(dayjs().toISOString());
+      const now = Date.now();
+      interviewStartTimeRef.current = now;
+      setInterviewStartTime(dayjs(now).toISOString());
     }
   }, [isInterviewStarted, isRecording, interviewStartTime]);
 
@@ -614,8 +618,8 @@ const useQuestionsHook = ({
 
   const calculateTotalDurationInSeconds = (endTime: string): number => {
     const interviewEndTime = new Date(endTime).getTime();
-    const startTime = interviewStartTime 
-      ? new Date(interviewStartTime).getTime() 
+    const startTime = interviewStartTime
+      ? new Date(interviewStartTime).getTime()
       : interviewEndTime;
     const durationMs = Math.abs(interviewEndTime - startTime);
     const durationSeconds = Math.ceil(durationMs / 1000);
@@ -722,12 +726,12 @@ const useQuestionsHook = ({
           break;
         }
       }
-      
+
       if (!bestFileKey && fileKeysRef.current.length > 0) {
         bestFileKey = fileKeysRef.current[fileKeysRef.current.length - 1];
       }
-      
-      const screenshotPayload = bestFileKey ? { candidate_screenshots_path: bestFileKey } : {}; 
+
+      const screenshotPayload = bestFileKey ? { candidate_screenshots_path: bestFileKey } : {};
 
       const payload = {
         duration: totalDurationInSeconds,
@@ -1239,8 +1243,8 @@ const useQuestionsHook = ({
     setShowNextButtonOrNot(false);
     setIsInterviewCompleted(true);
     if (isRecording) {
-        stopRecording();
-      }
+      stopRecording();
+    }
     setRenderTypeWriter(false);
 
     const audio = new Audio();
@@ -1286,8 +1290,8 @@ const useQuestionsHook = ({
   useEffect(() => {
     if (isInterviewStarted && questions.length && questionNo >= questions.length) {
       if (isRecording) {
-      stopRecording();
-    }
+        stopRecording();
+      }
       setQuestions([]);
       playConclude();
     }
@@ -1410,7 +1414,7 @@ const useQuestionsHook = ({
             ) / 100;
 
           const { eyeTimeIntervals } = detectionCounts.current;
-          
+
           const lastFileKey = fileKeysRef.current.length > 0 ? fileKeysRef.current[fileKeysRef.current.length - 1] : null;
           const screenshotPayload = lastFileKey ? { candidate_screenshots_path: lastFileKey } : {};
 
