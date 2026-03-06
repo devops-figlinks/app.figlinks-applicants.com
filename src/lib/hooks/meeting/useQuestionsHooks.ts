@@ -105,6 +105,7 @@ const useQuestionsHook = ({
   const MIN_CAPTURE_INTERVAL = 1000;
   
   const fileKeysRef = useRef<string[]>([]);
+  const interviewStartTimeRef = useRef<number | null>(null);
   const session_id = useMemo(() => {
     if (typeof crypto !== 'undefined' && crypto.randomUUID) {
       return crypto.randomUUID().substring(0, 8);
@@ -232,9 +233,10 @@ const useQuestionsHook = ({
             if (ctx && video.videoWidth > 0 && video.videoHeight > 0) {
               ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
               const base64 = canvas.toDataURL("image/jpeg", 0.92);
-              const timestamp = Date.now();
-              const fileName = `screenshot_${timestamp}.jpg`;
-
+              const elapsedSeconds = interviewStartTimeRef.current
+                ? Math.floor((Date.now() - interviewStartTimeRef.current) / 1000)
+                : 0;
+              const fileName = `screenshot_${elapsedSeconds}s.jpg`;
               video.pause();
               video.srcObject = null;
               video.removeEventListener("error", onError);
@@ -487,7 +489,9 @@ const useQuestionsHook = ({
 
   useEffect(() => {
     if (isInterviewStarted && isRecording && !interviewStartTime) {
-      setInterviewStartTime(dayjs().toISOString());
+      const now = Date.now();
+      interviewStartTimeRef.current = now;
+      setInterviewStartTime(dayjs(now).toISOString());
     }
   }, [isInterviewStarted, isRecording, interviewStartTime]);
 
