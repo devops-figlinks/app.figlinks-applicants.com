@@ -47,30 +47,6 @@ export const getInstructionsByIdAndCandidateCodeAPI = async ({
     throw err;
   }
 };
-
-
-// export const createMeetingWithTokenAPI = async ({
-//   accessToken,
-// }: {
-//   accessToken: string;
-// }) => {
-//   try {
-//     const url = BASEURL + "/meeting/rooms";
-//     const options = {
-//       method: "POST",
-//       headers: {
-//         "Content-Type": "application/json",
-//         Authorization: `${accessToken}`,
-//       },
-//     };
-
-//     const response = await fetch(url, options);
-//     let responseData = await response.json();
-//     return { ...responseData, status: response.status };
-//   } catch (err) {
-//     throw err;
-//   }
-// };
 export const createMeetingWithTokenAPI = async ({
   accessToken,
   body,
