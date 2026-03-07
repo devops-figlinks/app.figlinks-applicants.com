@@ -189,6 +189,7 @@ const useQuestionsHook = ({
   const introPlayedRef = useRef(false);
 
   const captureImage = (): Promise<{ fileName: string; base64: string } | null> => {
+    const captureStartTime = Date.now();
     return new Promise((resolve) => {
       const videoStreamEntry = localParticipant?.streams
         ? Array.from(localParticipant.streams.values()).find(
@@ -234,7 +235,7 @@ const useQuestionsHook = ({
               ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
               const base64 = canvas.toDataURL("image/jpeg", 0.92);
               const elapsedSeconds = interviewStartTimeRef.current
-                ? Math.floor((Date.now() - interviewStartTimeRef.current) / 1000)
+                ? Math.floor((captureStartTime - interviewStartTimeRef.current) / 1000)
                 : 0;
               const fileName = `screenshot_${elapsedSeconds}s.jpg`;
               video.pause();
@@ -653,6 +654,11 @@ const useQuestionsHook = ({
       if (interviewType !== "MCQ" && questionNo > 0 && questionAns[questionNo - 1]) {
         questionAns[questionNo - 1].end_time = lastQuestionEndTime;
       }
+
+      questionAns = questionAns.map((q) => ({
+        ...q,
+        end_time: q.end_time || lastQuestionEndTime,
+      }));
 
       const firstQuesStartTime =
         interviewType === "MCQ"
@@ -1336,12 +1342,10 @@ const useQuestionsHook = ({
       };
 
       let interviewQuestions = parsedData.questionsWithTimeStamps || [];
-      while (
-        interviewQuestions.length > 0 &&
-        interviewQuestions[interviewQuestions.length - 1].end_time === ""
-      ) {
-        interviewQuestions[interviewQuestions.length - 1].end_time = parsedData.timestamp123;
-      }
+      interviewQuestions = interviewQuestions.map((q) => ({
+        ...q,
+        end_time: q.end_time || parsedData.timestamp123,
+      }));
 
       const remainingQuestions = questions
         .slice(interviewQuestions.length)
