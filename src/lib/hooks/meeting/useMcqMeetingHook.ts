@@ -26,17 +26,7 @@ export const useMcqMeetingHook = (props: IMcqExamBlock & IQuestioningBlock) => {
     setTimer1,
   } = useQuestionsHook(props);
 
-  const [selectedAnswers, setSelectedAnswers] = useState<
-    Record<string, string>
-  >(() => {
-    const initialAnswers: Record<string, string> = {};
-    questions.forEach((question) => {
-      if (question.ans) {
-        initialAnswers[question.id] = question.ans;
-      }
-    });
-    return initialAnswers;
-  });
+  const [selectedAnswers, setSelectedAnswers] = useState<Record<string, string>>({});
   // const [currentStage, setCurrentStage] = useState<'intro' | 'questions' | 'conclusion'>('intro');
   const isOptionSelected = (optionText: string) => {
     return selectedAnswers[questionId] === optionText;

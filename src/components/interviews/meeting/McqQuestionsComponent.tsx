@@ -52,7 +52,7 @@ const McqQuestionsComponent = (props: IMcqQuestionsBlock) => {
             <p className="text-white md:text-black text-base 3xl:!text-lg font-medium leading-[140%] capitalize">
               {questionText}
             </p>
-            <div className="mt-2 mb-4 flex flex-col gap-2">
+            <div key={questionId ?? questionNo} className="mt-2 mb-4 flex flex-col gap-2">
               {options?.map((option, index) => (
                 <Label
                   key={index}

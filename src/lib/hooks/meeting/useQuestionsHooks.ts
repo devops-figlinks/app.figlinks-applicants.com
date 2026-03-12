@@ -189,7 +189,6 @@ const useQuestionsHook = ({
   const introPlayedRef = useRef(false);
 
   const captureImage = (): Promise<{ fileName: string; base64: string } | null> => {
-    const captureStartTime = Date.now();
     return new Promise((resolve) => {
       const videoStreamEntry = localParticipant?.streams
         ? Array.from(localParticipant.streams.values()).find(
@@ -235,7 +234,7 @@ const useQuestionsHook = ({
               ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
               const base64 = canvas.toDataURL("image/jpeg", 0.92);
               const elapsedSeconds = interviewStartTimeRef.current
-                ? Math.floor((captureStartTime - interviewStartTimeRef.current) / 1000)
+                ? Math.max(0, Math.floor((Date.now() - interviewStartTimeRef.current) / 1000))
                 : 0;
               const fileName = `screenshot_${elapsedSeconds}s.jpg`;
               video.pause();
@@ -488,13 +487,13 @@ const useQuestionsHook = ({
     }
   }, [counts.video, isInterviewStarted, isRecording, interviewCompleted]);
 
-  useEffect(() => {
-    if (isInterviewStarted && isRecording && !interviewStartTime) {
+  const markRecordingStart = () => {
+    if (!interviewStartTimeRef.current) {
       const now = Date.now();
       interviewStartTimeRef.current = now;
       setInterviewStartTime(dayjs(now).toISOString());
     }
-  }, [isInterviewStarted, isRecording, interviewStartTime]);
+  };
 
   const playIntro = async () => {
     if (introPlayedRef.current) return;
@@ -502,6 +501,7 @@ const useQuestionsHook = ({
     if (interviewType === "MCQ") {
       setIsInterviewStarted(true);
       setTimer(0);
+      markRecordingStart();
       startRec();
       return;
     }
@@ -549,6 +549,7 @@ const useQuestionsHook = ({
             } else {
               setIsInterviewStarted(true);
               setTimer(0);
+              markRecordingStart();
               startRec();
             }
           },
@@ -566,6 +567,7 @@ const useQuestionsHook = ({
         console.error("Error in playIntro:", err);
         setIsInterviewStarted(true);
         setTimer(0);
+        markRecordingStart();
         startRec();
       }
     } else {
@@ -587,6 +589,7 @@ const useQuestionsHook = ({
         setBotSpeechRendered(true);
       }, 1);
       setTimeout(() => {
+        markRecordingStart();
         startRec();
       }, (introAudioTime as number) * 1000);
 
@@ -885,6 +888,7 @@ const useQuestionsHook = ({
 
       setIsInterviewStarted(true);
       setTimer(0);
+      markRecordingStart();
       startRec();
       setIsIosInterview(false);
 
@@ -892,6 +896,7 @@ const useQuestionsHook = ({
       console.error("onIOSPlayClick error:", error);
       setIsInterviewStarted(true);
       setTimer(0);
+      markRecordingStart();
       startRec();
       setIsIosInterview(false);
     }
